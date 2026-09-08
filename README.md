@@ -1,6 +1,6 @@
 # Bot Server & Control Center
 
-Disposable GitHub Actions environment for running Telegram bots with a web-based GUI management panel, direct SSH access (`ngrok`), interactive Telegram bot commands, and 24/7 auto-renewing runner architecture.
+Disposable GitHub Actions environment for running Telegram bots with a web-based GUI management panel, direct SSH access (`tmate`), interactive Telegram bot commands, and 24/7 auto-renewing runner architecture.
 
 ## Structure
 
@@ -35,18 +35,18 @@ repository/
   - Live log streaming with search filter and pause/resume.
   - Environment variables viewer with secret masking toggle.
   - File Explorer for browsing directory contents and viewing source files.
-- **Direct SSH Access (ngrok TCP Tunnel)**:
-  - Connect directly from any terminal/PowerShell worldwide:
+- **Direct SSH Access (`tmate`)**:
+  - Direct native SSH terminal access from any computer or terminal worldwide:
     ```bash
-    ssh <SERVER_USERNAME>@0.tcp.ngrok.io -p <PORT>
+    ssh <SESSION_ID>@<REGION>.tmate.io
     ```
-  - Prompts for your standard `SERVER_PASSWORD` directly in terminal before granting shell access.
+  - Zero accounts, zero tokens, zero credit card requirements.
 - **Interactive Telegram Bot Commands**:
   - Automatically notifies your Telegram status chat when a new runner boots up with Web Panel URL & direct SSH command.
   - `🔄 /redeploy` or `/restart` - Trigger a fresh GitHub Actions workflow run and update the server instantly.
   - `📊 /status` - Real-time CPU/RAM stats and bot health.
   - `🌐 /panel` - Direct link to the Web Management Panel.
-  - `💻 /ssh` - Direct `ssh` terminal access command with allocated port.
+  - `💻 /ssh` - Direct `ssh` terminal command.
 - **Continuous 24/7 Uptime**:
   - 5-hour and 45-minute runner cycle with automated handoff triggering the next GitHub Actions workflow.
 
@@ -54,8 +54,8 @@ repository/
 
 When the workflow boots:
 1. **Cloudflare Tunnel** creates a secure HTTPS URL for the Web Control Panel (`https://<random>.trycloudflare.com`).
-2. **ngrok TCP Tunnel** forwards port 22 and allocates a public endpoint (`ssh user@0.tcp.ngrok.io -p <PORT>`).
-3. Both endpoints are sent to your Telegram status chat and printed in the workflow execution log.
+2. **`tmate`** establishes an SSH session relay (`ssh <id>@<region>.tmate.io`).
+3. Both endpoints are delivered to your Telegram status chat and logged in the workflow execution step.
 
 ## GitHub Configuration
 
@@ -63,14 +63,13 @@ When the workflow boots:
 
 | Variable | Description | Default (if unset) |
 |---|---|---|
-| `SERVER_USERNAME` | Web Panel & SSH login username | `admin` |
+| `SERVER_USERNAME` | Web Panel login username | `admin` |
 
 ### Secrets (**Settings → Secrets and variables → Actions → Secrets tab**)
 
 | Secret | Description | Default (if unset) |
 |---|---|---|
-| `SERVER_PASSWORD` | Web Panel & SSH login password | `admin` |
-| `NGROK_AUTHTOKEN` | ngrok authentication token for SSH TCP tunnel | None |
+| `SERVER_PASSWORD` | Web Panel login password | `admin` |
 | `GH_PAT` | Personal Access Token (`ArashAtomic`) to trigger workflow redeploys | None |
 | `CLONE_PAT` | Personal Access Token (`ArashMaghsoodi`) to clone private `love-whispers-bot` | None |
 | `LOVE_WHISPERS_ENV` | Complete `.env` content for Love Whispers | None |

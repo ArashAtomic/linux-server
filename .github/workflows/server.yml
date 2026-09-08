@@ -40,7 +40,6 @@ jobs:
         env:
           SERVER_USERNAME: ${{ vars.SERVER_USERNAME || secrets.SERVER_USERNAME || 'admin' }}
           SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD || 'admin' }}
-          NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
           GH_PAT: ${{ secrets.GH_PAT }}
           STATUS_BOT_TOKEN: ${{ secrets.STATUS_BOT_TOKEN }}
           STATUS_CHAT_ID: ${{ secrets.STATUS_CHAT_ID }}
@@ -53,7 +52,6 @@ jobs:
           STATUS_BOT_TOKEN: ${{ secrets.STATUS_BOT_TOKEN }}
           STATUS_CHAT_ID: ${{ secrets.STATUS_CHAT_ID }}
           SERVER_USERNAME: ${{ vars.SERVER_USERNAME || secrets.SERVER_USERNAME || 'admin' }}
-          NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
         run: ./scripts/heartbeat.sh
 
       - name: Keep Server Active (5h 45m or until Redeploy)
@@ -95,7 +93,6 @@ jobs:
             /tmp/packtogether.log
             /tmp/panel.log
             /tmp/cloudflared.log
-            /tmp/ngrok.log
           if-no-files-found: warn
 
       - name: Trigger Next Workflow Run (if not redeploying)

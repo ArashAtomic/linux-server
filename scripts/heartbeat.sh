@@ -65,16 +65,9 @@ if [ -s /tmp/cloudflared.url ]; then
     CF_URL=$(cat /tmp/cloudflared.url)
 fi
 
-SSH_CMD="Pending SSH tunnel..."
+SSH_CMD="Pending SSH command..."
 if [ -s /tmp/ssh_cmd.txt ]; then
     SSH_CMD=$(cat /tmp/ssh_cmd.txt)
-elif [ -z "${NGROK_AUTHTOKEN:-}" ]; then
-    SSH_CMD="⚠️ Add NGROK_AUTHTOKEN to GitHub Secrets"
-elif [ -f /tmp/ngrok.log ]; then
-    ERR_MSG=$(grep -oiE 'err_ngrok_[0-9]+' /tmp/ngrok.log | head -n 1 || true)
-    if [ -n "$ERR_MSG" ]; then
-        SSH_CMD="⚠️ ngrok error: $ERR_MSG"
-    fi
 fi
 
 USER_NAME="${SERVER_USERNAME:-admin}"

@@ -46,9 +46,12 @@ stop_process "Love Whispers" "/tmp/love-whispers.pid"
 stop_process "PackTogether" "/tmp/packtogether.pid"
 stop_process "Management Panel" "/tmp/panel.pid"
 stop_process "Cloudflare Tunnel" "/tmp/cloudflared.pid"
-stop_process "ngrok SSH Tunnel" "/tmp/ngrok.pid"
 
-rm -f /tmp/cloudflared.url /tmp/ssh_cmd.txt /tmp/ngrok.log
+if [ -f /tmp/tmate.sock ]; then
+    tmate -S /tmp/tmate.sock kill-session 2>/dev/null || true
+fi
+
+rm -f /tmp/cloudflared.url /tmp/ssh_cmd.txt /tmp/tmate.sock
 
 echo
 echo "All processes stopped."

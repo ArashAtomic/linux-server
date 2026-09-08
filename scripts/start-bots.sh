@@ -86,17 +86,13 @@ nohup cloudflared tunnel --url http://127.0.0.1:8080 --no-autoupdate > /tmp/clou
 CF_PID=$!
 echo "$CF_PID" > /tmp/cloudflared.pid
 
-# Start ngrok SSH TCP Tunnel
+# Start tmate SSH Terminal
 echo
-echo "==> Starting ngrok SSH TCP Tunnel"
-if [ -n "${NGROK_AUTHTOKEN:-}" ]; then
-    ngrok config add-authtoken "$NGROK_AUTHTOKEN" || true
-    nohup ngrok tcp 22 --log=stdout --log-format=json > /tmp/ngrok.log 2>&1 &
-    NGROK_PID=$!
-    echo "$NGROK_PID" > /tmp/ngrok.pid
-else
-    echo "WARNING: NGROK_AUTHTOKEN secret is not configured in GitHub Secrets!"
-fi
+echo "==> Starting tmate SSH Session"
+rm -f /tmp/tmate.sock /tmp/ssh_cmd.txt
+tmate -S /tmp/tmate.sock new-session -d || true
+tmate -S /tmp/tmate.sock wait-for-ready || true
+tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}' > /tmp/ssh_cmd.txt || true
 
 echo "Waiting for public tunnel endpoints..."
 for i in {1..20}; do
@@ -107,34 +103,7 @@ for i in {1..20}; do
     fi
 
     if [ ! -s /tmp/ssh_cmd.txt ]; then
-        python3 -c '
-import urllib.request, json, os, sys
-try:
-    with urllib.request.urlopen("http://127.0.0.1:4040/api/tunnels", timeout=2) as res:
-        data = json.loads(res.read().decode())
-        tunnels = data.get("tunnels", [])
-        if tunnels:
-            url = tunnels[0].get("public_url", "")
-            if url.startswith("tcp://"):
-                parts = url.replace("tcp://", "").split(":")
-                user = os.environ.get("SERVER_USERNAME", "admin")
-                cmd = f"ssh {user}@{parts[0]} -p {parts[1]}"
-                with open("/tmp/ssh_cmd.txt", "w") as f:
-                    f.write(cmd)
-                sys.exit(0)
-except Exception:
-    pass
-sys.exit(1)
-' || true
-
-        if [ ! -s /tmp/ssh_cmd.txt ] && [ -f /tmp/ngrok.log ]; then
-            TCP_URL=$(grep -oE 'tcp://[a-zA-Z0-9.-]+:[0-9]+' /tmp/ngrok.log | head -n 1 || true)
-            if [ -n "$TCP_URL" ]; then
-                HOST=$(echo "$TCP_URL" | sed 's|tcp://||' | cut -d: -f1)
-                PORT=$(echo "$TCP_URL" | sed 's|tcp://||' | cut -d: -f2)
-                echo "ssh ${SERVER_USERNAME:-admin}@$HOST -p $PORT" > /tmp/ssh_cmd.txt
-            fi
-        fi
+        tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}' > /tmp/ssh_cmd.txt 2>/dev/null || true
     fi
 
     if [ -s /tmp/cloudflared.url ] && [ -s /tmp/ssh_cmd.txt ]; then
@@ -158,8 +127,7 @@ fi
 if [ -s /tmp/ssh_cmd.txt ]; then
     echo "SSH Command: $(cat /tmp/ssh_cmd.txt)"
 else
-    echo "WARNING: ngrok SSH command not ready. Log:"
-    tail -n 10 /tmp/ngrok.log 2>/dev/null || true
+    echo "WARNING: tmate SSH command not ready."
 fi
 
 sleep 2
