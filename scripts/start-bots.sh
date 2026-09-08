@@ -86,18 +86,18 @@ nohup cloudflared tunnel --url http://127.0.0.1:8080 --no-autoupdate > /tmp/clou
 CF_PID=$!
 echo "$CF_PID" > /tmp/cloudflared.pid
 
-# Generate SSH key pair for tmate if missing
-if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
-    mkdir -p "$HOME/.ssh"
-    ssh-keygen -t ed25519 -f "$HOME/.ssh/id_ed25519" -N "" -q
-fi
+# Generate SSH key pairs for tmate
+mkdir -p "$HOME/.ssh"
+[ -f "$HOME/.ssh/id_rsa" ] || ssh-keygen -t rsa -b 2048 -f "$HOME/.ssh/id_rsa" -N "" -q
+[ -f "$HOME/.ssh/id_ed25519" ] || ssh-keygen -t ed25519 -f "$HOME/.ssh/id_ed25519" -N "" -q
 
 # Start tmate SSH Terminal
 echo
 echo "==> Starting tmate SSH Session"
-rm -f /tmp/tmate.sock /tmp/ssh_cmd.txt
-tmate -S /tmp/tmate.sock new-session -d || true
-tmate -S /tmp/tmate.sock wait-for-ready || true
+rm -f /tmp/tmate.sock /tmp/ssh_cmd.txt /tmp/tmate.log
+nohup tmate -S /tmp/tmate.sock -F > /tmp/tmate.log 2>&1 &
+TM_PID=$!
+echo "$TM_PID" > /tmp/tmate.pid
 
 echo "Waiting for public tunnel endpoints..."
 for i in {1..25}; do
@@ -108,7 +108,13 @@ for i in {1..25}; do
     fi
 
     if [ ! -s /tmp/ssh_cmd.txt ]; then
-        TM_CMD=$(tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}' 2>/dev/null || true)
+        TM_CMD=""
+        if [ -f /tmp/tmate.log ]; then
+            TM_CMD=$(grep -oiE 'ssh [a-zA-Z0-9]+@[a-zA-Z0-9.-]+\.tmate\.io' /tmp/tmate.log | head -n 1 || true)
+        fi
+        if [ -z "$TM_CMD" ] && [ -S /tmp/tmate.sock ]; then
+            TM_CMD=$(tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}' 2>/dev/null || true)
+        fi
         if [[ "$TM_CMD" == ssh* ]]; then
             echo "$TM_CMD" > /tmp/ssh_cmd.txt
         fi
@@ -135,7 +141,8 @@ fi
 if [ -s /tmp/ssh_cmd.txt ]; then
     echo "SSH Command: $(cat /tmp/ssh_cmd.txt)"
 else
-    echo "WARNING: tmate SSH command not ready."
+    echo "WARNING: tmate SSH command not ready. Log:"
+    tail -n 20 /tmp/tmate.log 2>/dev/null || true
 fi
 
 sleep 2

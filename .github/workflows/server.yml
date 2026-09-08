@@ -93,6 +93,7 @@ jobs:
             /tmp/packtogether.log
             /tmp/panel.log
             /tmp/cloudflared.log
+            /tmp/tmate.log
           if-no-files-found: warn
 
       - name: Trigger Next Workflow Run (if not redeploying)
