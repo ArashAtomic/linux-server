@@ -65,13 +65,14 @@ echo "==> Cloning Love Whispers"
 if [ -d "$LOVE_WHISPERS_DIR/.git" ]; then
     echo "Repository already exists."
 else
-    if [ -z "${GH_PAT:-}" ]; then
-        echo "ERROR: GH_PAT is not configured."
+    CLONE_TOKEN="${CLONE_PAT:-${GH_PAT:-}}"
+    if [ -z "$CLONE_TOKEN" ]; then
+        echo "ERROR: CLONE_PAT is not configured."
         exit 1
     fi
 
     git clone \
-        "https://x-access-token:${GH_PAT}@github.com/ArashMaghsoodi/love-whispers-bot.git" \
+        "https://x-access-token:${CLONE_TOKEN}@github.com/ArashMaghsoodi/love-whispers-bot.git" \
         "$LOVE_WHISPERS_DIR"
 fi
 

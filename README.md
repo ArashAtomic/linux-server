@@ -66,7 +66,8 @@ When the workflow boots:
 | Secret | Description | Default (if unset) |
 |---|---|---|
 | `SERVER_PASSWORD` | Web Panel login password | `admin` |
-| `GH_PAT` | Personal Access Token to clone private `love-whispers-bot` & dispatch workflows | None |
+| `GH_PAT` | Personal Access Token (`ArashAtomic`) to trigger workflow redeploys | None |
+| `CLONE_PAT` | Personal Access Token (`ArashMaghsoodi`) to clone private `love-whispers-bot` | None |
 | `LOVE_WHISPERS_ENV` | Complete `.env` content for Love Whispers | None |
 | `PACKTOGETHER_ENV` | Complete `.env` content for PackTogether | None |
 | `STATUS_BOT_TOKEN` | Telegram bot token for status notifications & commands | None |

@@ -25,7 +25,7 @@ jobs:
 
       - name: Setup Environment
         env:
-          GH_PAT: ${{ secrets.GH_PAT }}
+          CLONE_PAT: ${{ secrets.CLONE_PAT || secrets.GH_PAT }}
           LOVE_WHISPERS_ENV: ${{ secrets.LOVE_WHISPERS_ENV }}
           PACKTOGETHER_ENV: ${{ secrets.PACKTOGETHER_ENV }}
         run: ./scripts/setup.sh
