@@ -46,9 +46,9 @@ stop_process "Love Whispers" "/tmp/love-whispers.pid"
 stop_process "PackTogether" "/tmp/packtogether.pid"
 stop_process "Management Panel" "/tmp/panel.pid"
 stop_process "Cloudflare Tunnel" "/tmp/cloudflared.pid"
-stop_process "Pinggy SSH Tunnel" "/tmp/pinggy.pid"
+stop_process "ngrok SSH Tunnel" "/tmp/ngrok.pid"
 
-rm -f /tmp/cloudflared.url /tmp/ssh_cmd.txt /tmp/sshx.url
+rm -f /tmp/cloudflared.url /tmp/ssh_cmd.txt /tmp/ngrok.log
 
 echo
 echo "All processes stopped."

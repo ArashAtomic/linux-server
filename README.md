@@ -1,6 +1,6 @@
 # Bot Server & Control Center
 
-Disposable GitHub Actions environment for running Telegram bots with a web-based GUI management panel, direct SSH access (`Pinggy`), interactive Telegram bot commands, and 24/7 auto-renewing runner architecture.
+Disposable GitHub Actions environment for running Telegram bots with a web-based GUI management panel, direct SSH access (`ngrok`), interactive Telegram bot commands, and 24/7 auto-renewing runner architecture.
 
 ## Structure
 
@@ -35,10 +35,10 @@ repository/
   - Live log streaming with search filter and pause/resume.
   - Environment variables viewer with secret masking toggle.
   - File Explorer for browsing directory contents and viewing source files.
-- **Direct SSH Access (Pinggy TCP Tunnel)**:
+- **Direct SSH Access (ngrok TCP Tunnel)**:
   - Connect directly from any terminal/PowerShell worldwide:
     ```bash
-    ssh <SERVER_USERNAME>@pro.pinggy.io -p <PORT>
+    ssh <SERVER_USERNAME>@0.tcp.ngrok.io -p <PORT>
     ```
   - Prompts for your standard `SERVER_PASSWORD` directly in terminal before granting shell access.
 - **Interactive Telegram Bot Commands**:
@@ -54,7 +54,7 @@ repository/
 
 When the workflow boots:
 1. **Cloudflare Tunnel** creates a secure HTTPS URL for the Web Control Panel (`https://<random>.trycloudflare.com`).
-2. **Pinggy TCP Tunnel** forwards port 22 and allocates a public port (`ssh user@pro.pinggy.io -p <PORT>`).
+2. **ngrok TCP Tunnel** forwards port 22 and allocates a public endpoint (`ssh user@0.tcp.ngrok.io -p <PORT>`).
 3. Both endpoints are sent to your Telegram status chat and printed in the workflow execution log.
 
 ## GitHub Configuration
@@ -70,6 +70,7 @@ When the workflow boots:
 | Secret | Description | Default (if unset) |
 |---|---|---|
 | `SERVER_PASSWORD` | Web Panel & SSH login password | `admin` |
+| `NGROK_AUTHTOKEN` | ngrok authentication token for SSH TCP tunnel | None |
 | `GH_PAT` | Personal Access Token (`ArashAtomic`) to trigger workflow redeploys | None |
 | `CLONE_PAT` | Personal Access Token (`ArashMaghsoodi`) to clone private `love-whispers-bot` | None |
 | `LOVE_WHISPERS_ENV` | Complete `.env` content for Love Whispers | None |

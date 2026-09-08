@@ -117,7 +117,7 @@ def get_ssh_cmd():
         except Exception:
             pass
     user = os.environ.get("SERVER_USERNAME", "admin")
-    return f"ssh {user}@pro.pinggy.io -p <port>"
+    return f"ssh {user}@0.tcp.ngrok.io -p <port>"
 
 def format_uptime(seconds):
     seconds = int(seconds)

@@ -86,12 +86,17 @@ nohup cloudflared tunnel --url http://127.0.0.1:8080 --no-autoupdate > /tmp/clou
 CF_PID=$!
 echo "$CF_PID" > /tmp/cloudflared.pid
 
-# Start Pinggy SSH TCP Tunnel
+# Start ngrok SSH TCP Tunnel
 echo
-echo "==> Starting Pinggy SSH TCP Tunnel"
-nohup ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -p 443 -R0:localhost:22 free@pro.pinggy.io > /tmp/pinggy.log 2>&1 &
-PINGGY_PID=$!
-echo "$PINGGY_PID" > /tmp/pinggy.pid
+echo "==> Starting ngrok SSH TCP Tunnel"
+if [ -n "${NGROK_AUTHTOKEN:-}" ]; then
+    ngrok config add-authtoken "$NGROK_AUTHTOKEN" || true
+    nohup ngrok tcp 22 --log=stdout --log-format=json > /tmp/ngrok.log 2>&1 &
+    NGROK_PID=$!
+    echo "$NGROK_PID" > /tmp/ngrok.pid
+else
+    echo "WARNING: NGROK_AUTHTOKEN is not configured."
+fi
 
 echo "Waiting for public tunnel endpoints..."
 for i in {1..20}; do
@@ -101,11 +106,14 @@ for i in {1..20}; do
         fi
     fi
     if [ ! -s /tmp/ssh_cmd.txt ]; then
-        if [ -f /tmp/pinggy.log ]; then
-            PORT=$(grep -oE 'Allocated port [0-9]+' /tmp/pinggy.log | awk '{print $3}' | head -n 1 || true)
-            if [ -n "$PORT" ]; then
-                echo "ssh ${SERVER_USERNAME:-admin}@pro.pinggy.io -p $PORT" > /tmp/ssh_cmd.txt
-            fi
+        TCP_URL=$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | jq -r '.tunnels[0].public_url // empty' 2>/dev/null || true)
+        if [ -z "$TCP_URL" ] && [ -f /tmp/ngrok.log ]; then
+            TCP_URL=$(grep -oE 'tcp://[a-zA-Z0-9.-]+:[0-9]+' /tmp/ngrok.log | head -n 1 || true)
+        fi
+        if [ -n "$TCP_URL" ]; then
+            HOST=$(echo "$TCP_URL" | sed 's|tcp://||' | cut -d: -f1)
+            PORT=$(echo "$TCP_URL" | sed 's|tcp://||' | cut -d: -f2)
+            echo "ssh ${SERVER_USERNAME:-admin}@$HOST -p $PORT" > /tmp/ssh_cmd.txt
         fi
     fi
     if [ -s /tmp/cloudflared.url ] && [ -s /tmp/ssh_cmd.txt ]; then
@@ -129,8 +137,8 @@ fi
 if [ -s /tmp/ssh_cmd.txt ]; then
     echo "SSH Command: $(cat /tmp/ssh_cmd.txt)"
 else
-    echo "WARNING: Pinggy SSH port not ready. Log:"
-    tail -n 10 /tmp/pinggy.log || true
+    echo "WARNING: ngrok SSH command not ready. Log:"
+    tail -n 10 /tmp/ngrok.log 2>/dev/null || true
 fi
 
 sleep 2
