@@ -40,6 +40,7 @@ jobs:
         env:
           SERVER_USERNAME: ${{ vars.SERVER_USERNAME || secrets.SERVER_USERNAME || 'admin' }}
           SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD || 'admin' }}
+          TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
           GH_PAT: ${{ secrets.GH_PAT }}
           STATUS_BOT_TOKEN: ${{ secrets.STATUS_BOT_TOKEN }}
           STATUS_CHAT_ID: ${{ secrets.STATUS_CHAT_ID }}
@@ -92,8 +93,7 @@ jobs:
             /tmp/love-whispers.log
             /tmp/packtogether.log
             /tmp/panel.log
-            /tmp/cloudflared.log
-            /tmp/tmate.log
+            /tmp/funnel_ssh.log
           if-no-files-found: warn
 
       - name: Trigger Next Workflow Run (if not redeploying)

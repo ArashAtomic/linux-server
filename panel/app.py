@@ -96,7 +96,15 @@ def get_bot_proc(bot_key):
             pass
     return None
 
-def get_cloudflare_url():
+def get_panel_url():
+    if os.path.exists("/tmp/panel_url.txt"):
+        try:
+            with open("/tmp/panel_url.txt", "r") as f:
+                url = f.read().strip()
+                if url.startswith("http"):
+                    return url
+        except Exception:
+            pass
     if os.path.exists("/tmp/cloudflared.url"):
         try:
             with open("/tmp/cloudflared.url", "r") as f:
@@ -112,12 +120,12 @@ def get_ssh_cmd():
         try:
             with open("/tmp/ssh_cmd.txt", "r") as f:
                 cmd = f.read().strip()
-                if cmd:
+                if cmd.startswith("ssh"):
                     return cmd
         except Exception:
             pass
     user = os.environ.get("SERVER_USERNAME", "admin")
-    return f"ssh {user}@0.tcp.ngrok.io -p <port>"
+    return f"ssh -p 443 {user}@<machine>.<tailnet>.ts.net"
 
 def format_uptime(seconds):
     seconds = int(seconds)
@@ -231,7 +239,7 @@ def telegram_poll_worker():
                     elif cmd in ["/status", "/ping"]:
                         cpu = psutil.cpu_percent(interval=0.2)
                         ram = psutil.virtual_memory()
-                        cf_url = get_cloudflare_url()
+                        cf_url = get_panel_url()
                         ssh_cmd = get_ssh_cmd()
                         
                         b1 = "🟢 RUNNING" if get_bot_proc("love-whispers") else "🔴 STOPPED"
@@ -251,7 +259,7 @@ def telegram_poll_worker():
                         send_telegram_msg(status_msg)
 
                     elif cmd == "/panel":
-                        cf_url = get_cloudflare_url()
+                        cf_url = get_panel_url()
                         send_telegram_msg(f"🌐 <b>Web Control Panel:</b>\n<a href=\"{cf_url}\">{cf_url}</a>")
 
                     elif cmd in ["/ssh", "/terminal", "/sshx"]:
@@ -301,7 +309,7 @@ def status():
     ram = psutil.virtual_memory()
     disk = psutil.disk_usage("/")
     
-    cf_url = get_cloudflare_url()
+    cf_url = get_panel_url()
     ssh_cmd = get_ssh_cmd()
     
     bot_status = {}

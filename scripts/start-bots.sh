@@ -11,7 +11,7 @@ LOVE_WHISPERS_DIR="$BOT_DIR/love-whispers-bot"
 PACKTOGETHER_DIR="$BOT_DIR/PackTogether"
 
 echo "======================================"
-echo "Starting bots, Panel, and Tunnels"
+echo "Starting bots, Panel, and Tailscale Funnel"
 echo "======================================"
 
 # Read persistent bot enabled flags
@@ -57,6 +57,22 @@ else
     rm -f /tmp/packtogether.pid
 fi
 
+# Setup OpenSSH Server
+echo
+echo "==> Configuring OpenSSH Server"
+sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config 2>/dev/null || true
+sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config 2>/dev/null || true
+sudo systemctl restart ssh || sudo service ssh restart || true
+
+SSH_USER="${SERVER_USERNAME:-admin}"
+SSH_PASS="${SERVER_PASSWORD:-admin}"
+
+echo "==> Configuring SSH User: $SSH_USER"
+sudo useradd -m -s /bin/bash "$SSH_USER" 2>/dev/null || true
+echo "$SSH_USER:$SSH_PASS" | sudo chpasswd
+sudo usermod -aG sudo "$SSH_USER" 2>/dev/null || true
+echo "$SSH_USER ALL=(ALL) NOPASSWD:ALL" | sudo tee "/etc/sudoers.d/$SSH_USER" >/dev/null
+
 # Management Panel
 echo
 echo "==> Starting Management Panel GUI"
@@ -64,8 +80,8 @@ echo "==> Starting Management Panel GUI"
 cd "$PANEL_DIR"
 source .venv/bin/activate
 
-export SERVER_USERNAME="${SERVER_USERNAME:-admin}"
-export SERVER_PASSWORD="${SERVER_PASSWORD:-admin}"
+export SERVER_USERNAME="$SSH_USER"
+export SERVER_PASSWORD="$SSH_PASS"
 export GH_PAT="${GH_PAT:-}"
 export STATUS_BOT_TOKEN="${STATUS_BOT_TOKEN:-}"
 export STATUS_CHAT_ID="${STATUS_CHAT_ID:-}"
@@ -79,70 +95,122 @@ deactivate
 
 echo "Management Panel PID: $PANEL_PID (Port 8080)"
 
-# Start Cloudflare Tunnel for Web Panel
+# Connect Tailscale and Configure Tailscale Funnel
 echo
-echo "==> Starting Cloudflare Tunnel"
-nohup cloudflared tunnel --url http://127.0.0.1:8080 --no-autoupdate > /tmp/cloudflared.log 2>&1 &
-CF_PID=$!
-echo "$CF_PID" > /tmp/cloudflared.pid
+echo "==> Connecting Tailscale"
+rm -f /tmp/ssh_cmd.txt /tmp/panel_url.txt
 
-# Ensure SSH server is running (tmate tunnels into local sshd)
-echo
-echo "==> Configuring OpenSSH Server"
-sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config 2>/dev/null || true
-sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config 2>/dev/null || true
-sudo systemctl restart ssh || sudo service ssh restart || true
+if [ -n "${TAILSCALE_AUTHKEY:-}" ]; then
+    sudo tailscale up --authkey="$TAILSCALE_AUTHKEY" --hostname="bot-server" --accept-routes || true
+else
+    echo "WARNING: TAILSCALE_AUTHKEY is not configured."
+fi
 
-# Start tmate SSH Terminal (uses official public tmate servers, self-hosted fallback)
-echo
-echo "==> Starting tmate SSH Session"
-rm -f /tmp/tmate.sock /tmp/ssh_cmd.txt /tmp/tmate.log /tmp/tmate_stderr.log
+# Verify Tailscale status
+tailscale status || true
 
-# tmate reads server config from ~/.tmate.conf; do NOT pin a broken host -
-# default is tmate.io which auto-negotiates via SSH_FQDN. Try default first.
-nohup tmate -S /tmp/tmate.sock -F > /tmp/tmate.log 2>&1 &
-TM_PID=$!
-echo "$TM_PID" > /tmp/tmate.pid
+TS_DOMAIN=$(tailscale status --json 2>/dev/null | jq -r '.Self.DNSName // empty' | sed 's/\.$//' || true)
+if [ -z "$TS_DOMAIN" ]; then
+    TS_DOMAIN=$(tailscale status 2>/dev/null | grep -v '#' | awk 'NR==1 {print $2}' || true)
+fi
 
-echo "Waiting for public tunnel endpoints..."
-for i in {1..40}; do
-    if [ ! -s /tmp/cloudflared.url ]; then
-        if [ -f /tmp/cloudflared.log ]; then
-            grep -oiE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' /tmp/cloudflared.log | head -n 1 > /tmp/cloudflared.url || true
-        fi
+echo "Tailscale Domain: ${TS_DOMAIN:-unknown}"
+
+# Configure Tailscale Funnel for SSH (Port 443 preferred, fallback 8443, 10000)
+FUNNEL_PORT=""
+setup_ssh_funnel() {
+    local target_port="$1"
+    echo "Trying Tailscale Funnel on port $target_port -> localhost:22..."
+    
+    # Try background funnel command
+    if sudo tailscale funnel --bg "$target_port" tcp://localhost:22 2>/dev/null; then
+        return 0
     fi
 
-    if [ ! -s /tmp/ssh_cmd.txt ] && [ -S /tmp/tmate.sock ]; then
-        TM_CMD=$(tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}' 2>/dev/null || true)
-        if [[ "$TM_CMD" == ssh* ]]; then
-            echo "$TM_CMD" > /tmp/ssh_cmd.txt
-        fi
+    # Try serve tcp + funnel on
+    if sudo tailscale serve --bg --tcp "$target_port" tcp://localhost:22 2>/dev/null || \
+       sudo tailscale serve --bg "$target_port" tcp://localhost:22 2>/dev/null; then
+        sudo tailscale funnel "$target_port" on 2>/dev/null || true
+        return 0
     fi
 
-    if [ -s /tmp/cloudflared.url ] && [ -s /tmp/ssh_cmd.txt ]; then
+    # Try foreground funnel in background
+    if nohup sudo tailscale funnel "$target_port" tcp://localhost:22 > /tmp/funnel_ssh.log 2>&1 & then
+        sleep 2
+        return 0
+    fi
+
+    return 1
+}
+
+for PORT in 443 8443 10000; do
+    if setup_ssh_funnel "$PORT"; then
+        FUNNEL_PORT="$PORT"
+        echo "SUCCESS: Tailscale Funnel active for SSH on port $FUNNEL_PORT"
         break
     fi
-    sleep 1
 done
+
+# Persist Funnel configuration across reboots via systemd service
+if [ -n "$FUNNEL_PORT" ]; then
+    cat <<EOF | sudo tee /etc/systemd/system/tailscale-funnel.service >/dev/null
+[Unit]
+Description=Tailscale Funnel Public SSH Forwarding
+After=tailscaled.service
+Wants=tailscaled.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/tailscale funnel --bg ${FUNNEL_PORT} tcp://localhost:22
+ExecStop=/usr/bin/tailscale funnel ${FUNNEL_PORT} off
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    sudo systemctl daemon-reload 2>/dev/null || true
+    sudo systemctl enable tailscale-funnel.service 2>/dev/null || true
+fi
+
+# Configure Web Panel access (Funnel on secondary port)
+PANEL_PORT="8443"
+if [ "$FUNNEL_PORT" = "8443" ]; then
+    PANEL_PORT="10000"
+elif [ "$FUNNEL_PORT" = "10000" ]; then
+    PANEL_PORT="8443"
+fi
+
+sudo tailscale funnel --bg "$PANEL_PORT" http://localhost:8080 2>/dev/null || \
+sudo tailscale serve --bg "$PANEL_PORT" http://localhost:8080 2>/dev/null || true
+sudo tailscale funnel "$PANEL_PORT" on 2>/dev/null || true
+
+# Check Funnel Status
+echo
+echo "==> Tailscale Funnel Status:"
+tailscale funnel status 2>/dev/null || tailscale serve status 2>/dev/null || true
+
+# Construct public SSH command & Panel URL
+if [ -n "$TS_DOMAIN" ] && [ -n "$FUNNEL_PORT" ]; then
+    SSH_CMD="ssh -p $FUNNEL_PORT $SSH_USER@$TS_DOMAIN"
+    echo "$SSH_CMD" > /tmp/ssh_cmd.txt
+    echo "https://$TS_DOMAIN:$PANEL_PORT" > /tmp/panel_url.txt
+elif [ -n "$TS_DOMAIN" ]; then
+    TS_IP=$(tailscale ip -4 2>/dev/null || echo "127.0.0.1")
+    SSH_CMD="ssh $SSH_USER@$TS_IP"
+    echo "$SSH_CMD" > /tmp/ssh_cmd.txt
+    echo "http://$TS_IP:8080" > /tmp/panel_url.txt
+else
+    echo "ssh $SSH_USER@localhost" > /tmp/ssh_cmd.txt
+    echo "http://localhost:8080" > /tmp/panel_url.txt
+fi
 
 echo
 echo "======================================"
-echo "Processes and Tunnels Active"
+echo "Processes and Funnel Active"
 echo "======================================"
 
-if [ -s /tmp/cloudflared.url ]; then
-    echo "Cloudflare Panel URL: $(cat /tmp/cloudflared.url)"
-else
-    echo "WARNING: Cloudflare URL not ready. Log:"
-    tail -n 10 /tmp/cloudflared.log || true
-fi
-
-if [ -s /tmp/ssh_cmd.txt ]; then
-    echo "SSH Command: $(cat /tmp/ssh_cmd.txt)"
-else
-    echo "WARNING: tmate SSH command not ready. Log:"
-    tail -n 20 /tmp/tmate.log 2>/dev/null || true
-fi
+echo "Web Panel URL : $(cat /tmp/panel_url.txt)"
+echo "SSH Command   : $(cat /tmp/ssh_cmd.txt)"
 
 sleep 2
 

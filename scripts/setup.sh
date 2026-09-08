@@ -29,7 +29,6 @@ sudo apt-get install -y \
     htop \
     neofetch \
     tmux \
-    tmate \
     nano \
     vim \
     tree \
@@ -37,14 +36,13 @@ sudo apt-get install -y \
     net-tools \
     iputils-ping \
     dnsutils \
-    unzip
+    unzip \
+    openssh-server
 
 echo
-echo "==> Installing cloudflared"
-curl -fsSL --output /tmp/cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-sudo dpkg -i /tmp/cloudflared.deb || sudo apt-get install -f -y
-rm -f /tmp/cloudflared.deb
-cloudflared --version
+echo "==> Installing Tailscale"
+curl -fsSL https://tailscale.com/install.sh | sh
+tailscale version || true
 
 echo
 echo "==> Installing Python 3.12"

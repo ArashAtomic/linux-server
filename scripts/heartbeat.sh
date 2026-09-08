@@ -52,25 +52,22 @@ bot_status_plain() {
     echo "🔴 $NAME: STOPPED"
 }
 
-# Wait up to 10 extra seconds for tunnels if not yet written
+# Wait up to 10 seconds for endpoint files if not yet written
 for i in {1..10}; do
-    if [ -s /tmp/cloudflared.url ] && [ -s /tmp/ssh_cmd.txt ]; then
+    if [ -s /tmp/panel_url.txt ] && [ -s /tmp/ssh_cmd.txt ]; then
         break
     fi
     sleep 1
 done
 
-CF_URL="Pending Cloudflare..."
-if [ -s /tmp/cloudflared.url ]; then
-    CF_URL=$(cat /tmp/cloudflared.url)
+PANEL_URL="http://localhost:8080"
+if [ -s /tmp/panel_url.txt ]; then
+    PANEL_URL=$(cat /tmp/panel_url.txt)
 fi
 
-SSH_CMD="Pending SSH command..."
+SSH_CMD="ssh admin@localhost"
 if [ -s /tmp/ssh_cmd.txt ]; then
-    RAW_SSH=$(cat /tmp/ssh_cmd.txt)
-    if [[ "$RAW_SSH" == ssh* ]]; then
-        SSH_CMD="$RAW_SSH"
-    fi
+    SSH_CMD=$(cat /tmp/ssh_cmd.txt)
 fi
 
 USER_NAME="${SERVER_USERNAME:-admin}"
@@ -83,10 +80,10 @@ RAM_INFO=$(get_memory)
 TELEGRAM_MSG="<b>🚀 BOT SERVER IS ONLINE</b>
 
 <b>🌐 Web Control Panel</b>
-<a href=\"${CF_URL}\">${CF_URL}</a>
+<a href=\"${PANEL_URL}\">${PANEL_URL}</a>
 <i>Username:</i> <code>${USER_NAME}</code>
 
-<b>💻 SSH Terminal Access</b>
+<b>💻 SSH Terminal Access (Tailscale Funnel)</b>
 <code>${SSH_CMD}</code>
 
 <b>🤖 Bot Status</b>
@@ -100,9 +97,9 @@ Started at: ${NOW}"
 
 PLAIN_MSG="==================================================
   🚀 BOT SERVER IS ONLINE
-  🌐 Web Control Panel  : ${CF_URL}
+  🌐 Web Control Panel   : ${PANEL_URL}
   💻 SSH Terminal Access : ${SSH_CMD}
-  👤 Username           : ${USER_NAME}
+  👤 Username            : ${USER_NAME}
   ------------------------------------------------
   🤖 Bot Status:
     ${STATUS_LOVE}

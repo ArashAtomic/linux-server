@@ -3,7 +3,7 @@
 set +e
 
 echo "======================================"
-echo "Stopping server processes & tunnels"
+echo "Stopping server processes & Funnel"
 echo "======================================"
 
 stop_process() {
@@ -45,14 +45,8 @@ stop_process() {
 stop_process "Love Whispers" "/tmp/love-whispers.pid"
 stop_process "PackTogether" "/tmp/packtogether.pid"
 stop_process "Management Panel" "/tmp/panel.pid"
-stop_process "Cloudflare Tunnel" "/tmp/cloudflared.pid"
-stop_process "tmate Session" "/tmp/tmate.pid"
 
-if [ -f /tmp/tmate.sock ]; then
-    tmate -S /tmp/tmate.sock kill-session 2>/dev/null || true
-fi
-
-rm -f /tmp/cloudflared.url /tmp/ssh_cmd.txt /tmp/tmate.sock /tmp/tmate.log
+rm -f /tmp/panel_url.txt /tmp/ssh_cmd.txt /tmp/funnel_ssh.log
 
 echo
 echo "All processes stopped."
