@@ -25,6 +25,8 @@ jobs:
 
       - name: Setup Environment
         env:
+          SERVER_USERNAME: ${{ vars.SERVER_USERNAME || secrets.SERVER_USERNAME || 'admin' }}
+          SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD || 'admin' }}
           CLONE_PAT: ${{ secrets.CLONE_PAT || secrets.GH_PAT }}
           LOVE_WHISPERS_ENV: ${{ secrets.LOVE_WHISPERS_ENV }}
           PACKTOGETHER_ENV: ${{ secrets.PACKTOGETHER_ENV }}
@@ -87,7 +89,7 @@ jobs:
             /tmp/packtogether.log
             /tmp/panel.log
             /tmp/cloudflared.log
-            /tmp/sshx.log
+            /tmp/pinggy.log
           if-no-files-found: warn
 
       - name: Trigger Next Workflow Run (if not redeploying)

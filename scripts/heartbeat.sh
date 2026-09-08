@@ -54,7 +54,7 @@ bot_status_plain() {
 
 # Wait up to 10 extra seconds for tunnels if not yet written
 for i in {1..10}; do
-    if [ -s /tmp/cloudflared.url ] && [ -s /tmp/sshx.url ]; then
+    if [ -s /tmp/cloudflared.url ] && [ -s /tmp/ssh_cmd.txt ]; then
         break
     fi
     sleep 1
@@ -65,9 +65,9 @@ if [ -s /tmp/cloudflared.url ]; then
     CF_URL=$(cat /tmp/cloudflared.url)
 fi
 
-SSHX_URL="Pending sshx..."
-if [ -s /tmp/sshx.url ]; then
-    SSHX_URL=$(cat /tmp/sshx.url)
+SSH_CMD="Pending SSH tunnel..."
+if [ -s /tmp/ssh_cmd.txt ]; then
+    SSH_CMD=$(cat /tmp/ssh_cmd.txt)
 fi
 
 USER_NAME="${SERVER_USERNAME:-admin}"
@@ -79,12 +79,12 @@ RAM_INFO=$(get_memory)
 
 TELEGRAM_MSG="<b>🚀 BOT SERVER IS ONLINE</b>
 
-<b>🌐 Web Control Panel (Cloudflare)</b>
+<b>🌐 Web Control Panel</b>
 <a href=\"${CF_URL}\">${CF_URL}</a>
 <i>Username:</i> <code>${USER_NAME}</code>
 
-<b>⚡ Browser Terminal (sshx)</b>
-<a href=\"${SSHX_URL}\">${SSHX_URL}</a>
+<b>💻 SSH Terminal Access</b>
+<code>${SSH_CMD}</code>
 
 <b>🤖 Bot Status</b>
 ${STATUS_LOVE}
@@ -98,8 +98,8 @@ Started at: ${NOW}"
 PLAIN_MSG="==================================================
   🚀 BOT SERVER IS ONLINE
   🌐 Web Control Panel  : ${CF_URL}
-  ⚡ Browser Terminal   : ${SSHX_URL}
-  👤 Panel Username      : ${USER_NAME}
+  💻 SSH Terminal Access : ${SSH_CMD}
+  👤 Username           : ${USER_NAME}
   ------------------------------------------------
   🤖 Bot Status:
     ${STATUS_LOVE}

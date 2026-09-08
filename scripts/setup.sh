@@ -36,7 +36,23 @@ sudo apt-get install -y \
     net-tools \
     iputils-ping \
     dnsutils \
-    unzip
+    unzip \
+    openssh-server
+
+echo
+echo "==> Configuring OpenSSH Server"
+sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+sudo systemctl restart ssh || sudo service ssh restart || true
+
+SSH_USER="${SERVER_USERNAME:-admin}"
+SSH_PASS="${SERVER_PASSWORD:-admin}"
+
+echo "==> Creating SSH User: $SSH_USER"
+sudo useradd -m -s /bin/bash "$SSH_USER" || true
+echo "$SSH_USER:$SSH_PASS" | sudo chpasswd
+sudo usermod -aG sudo "$SSH_USER"
+echo "$SSH_USER ALL=(ALL) NOPASSWD:ALL" | sudo tee "/etc/sudoers.d/$SSH_USER" >/dev/null
 
 echo
 echo "==> Installing cloudflared"
@@ -44,11 +60,6 @@ curl -fsSL --output /tmp/cloudflared.deb https://github.com/cloudflare/cloudflar
 sudo dpkg -i /tmp/cloudflared.deb || sudo apt-get install -f -y
 rm -f /tmp/cloudflared.deb
 cloudflared --version
-
-echo
-echo "==> Installing sshx"
-curl -sSf https://sshx.io/get | sudo sh -s -- --dir /usr/local/bin || curl -sSf https://sshx.io/get | sh || true
-which sshx || echo "sshx binary path check"
 
 echo
 echo "==> Installing Python 3.12"

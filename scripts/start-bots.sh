@@ -86,26 +86,29 @@ nohup cloudflared tunnel --url http://127.0.0.1:8080 --no-autoupdate > /tmp/clou
 CF_PID=$!
 echo "$CF_PID" > /tmp/cloudflared.pid
 
-# Start sshx Web Terminal
+# Start Pinggy SSH TCP Tunnel
 echo
-echo "==> Starting sshx Web Terminal"
-nohup /usr/local/bin/sshx > /tmp/sshx.log 2>&1 || nohup ~/.local/bin/sshx > /tmp/sshx.log 2>&1 || nohup sshx > /tmp/sshx.log 2>&1 &
-SSHX_PID=$!
-echo "$SSHX_PID" > /tmp/sshx.pid
+echo "==> Starting Pinggy SSH TCP Tunnel"
+nohup ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -p 443 -R0:localhost:22 free@pro.pinggy.io > /tmp/pinggy.log 2>&1 &
+PINGGY_PID=$!
+echo "$PINGGY_PID" > /tmp/pinggy.pid
 
-echo "Waiting for public tunnel URLs..."
+echo "Waiting for public tunnel endpoints..."
 for i in {1..20}; do
     if [ ! -s /tmp/cloudflared.url ]; then
         if [ -f /tmp/cloudflared.log ]; then
             grep -oiE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' /tmp/cloudflared.log | head -n 1 > /tmp/cloudflared.url || true
         fi
     fi
-    if [ ! -s /tmp/sshx.url ]; then
-        if [ -f /tmp/sshx.log ]; then
-            grep -oiE 'https://sshx\.io/s/[a-zA-Z0-9#-]+' /tmp/sshx.log | head -n 1 > /tmp/sshx.url || true
+    if [ ! -s /tmp/ssh_cmd.txt ]; then
+        if [ -f /tmp/pinggy.log ]; then
+            PORT=$(grep -oE 'Allocated port [0-9]+' /tmp/pinggy.log | awk '{print $3}' | head -n 1 || true)
+            if [ -n "$PORT" ]; then
+                echo "ssh ${SERVER_USERNAME:-admin}@pro.pinggy.io -p $PORT" > /tmp/ssh_cmd.txt
+            fi
         fi
     fi
-    if [ -s /tmp/cloudflared.url ] && [ -s /tmp/sshx.url ]; then
+    if [ -s /tmp/cloudflared.url ] && [ -s /tmp/ssh_cmd.txt ]; then
         break
     fi
     sleep 1
@@ -123,11 +126,11 @@ else
     tail -n 10 /tmp/cloudflared.log || true
 fi
 
-if [ -s /tmp/sshx.url ]; then
-    echo "sshx Terminal URL: $(cat /tmp/sshx.url)"
+if [ -s /tmp/ssh_cmd.txt ]; then
+    echo "SSH Command: $(cat /tmp/ssh_cmd.txt)"
 else
-    echo "WARNING: sshx URL not ready. Log:"
-    tail -n 10 /tmp/sshx.log || true
+    echo "WARNING: Pinggy SSH port not ready. Log:"
+    tail -n 10 /tmp/pinggy.log || true
 fi
 
 sleep 2

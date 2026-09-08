@@ -255,12 +255,12 @@
 
             <div class="panel metric-card">
                 <div class="metric-top">
-                    <div class="metric-label">Browser Terminal</div>
+                    <div class="metric-label">SSH Access</div>
                     <div class="metric-icon">⚡</div>
                 </div>
-                <div class="metric-value" style="font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="sshx-val">sshx terminal...</div>
+                <div class="metric-value" style="font-size: 13px;" id="ssh-val">ssh admin@pro.pinggy.io -p ...</div>
                 <div class="metric-detail">
-                    <button class="btn" style="padding: 3px 8px; margin-top: 5px;" onclick="openSSHX()">🔗 Open Terminal</button>
+                    <button class="btn" style="padding: 3px 8px; margin-top: 5px;" onclick="copySSH()">📋 Copy SSH Cmd</button>
                 </div>
             </div>
         </div>
@@ -399,7 +399,7 @@
     let envData = {};
     let rawLogs = '';
     let paused = false;
-    let sshxUrl = '';
+    let sshCmd = '';
     let currentPath = '';
 
     function showToast(msg, type = 'success') {
@@ -431,8 +431,8 @@
             document.getElementById('fleet-progress').style.width = `${(data.fleet.online / data.fleet.total) * 100}%`;
 
             document.getElementById('uptime-val').innerText = `Uptime: ${data.system.uptime}`;
-            document.getElementById('sshx-val').innerText = data.system.sshx_url;
-            sshxUrl = data.system.sshx_url;
+            document.getElementById('ssh-val').innerText = data.system.ssh_command;
+            sshCmd = data.system.ssh_command;
 
             for (const [key, bot] of Object.entries(data.bots)) {
                 const statusEl = document.getElementById(`status-${key}`);
@@ -585,11 +585,10 @@
         } catch (e) { showToast("Failed to perform action", 'error'); }
     }
 
-    function openSSHX() {
-        if (sshxUrl && sshxUrl.startsWith('https://')) {
-            window.open(sshxUrl, '_blank');
-        } else {
-            showToast("sshx session URL is not ready yet.", "error");
+    function copySSH() {
+        if (sshCmd) {
+            navigator.clipboard.writeText(sshCmd);
+            showToast("SSH command copied to clipboard!");
         }
     }
 

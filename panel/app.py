@@ -107,16 +107,17 @@ def get_cloudflare_url():
             pass
     return "http://localhost:8080"
 
-def get_sshx_url():
-    if os.path.exists("/tmp/sshx.url"):
+def get_ssh_cmd():
+    if os.path.exists("/tmp/ssh_cmd.txt"):
         try:
-            with open("/tmp/sshx.url", "r") as f:
-                url = f.read().strip()
-                if url.startswith("https://"):
-                    return url
+            with open("/tmp/ssh_cmd.txt", "r") as f:
+                cmd = f.read().strip()
+                if cmd:
+                    return cmd
         except Exception:
             pass
-    return "Pending sshx..."
+    user = os.environ.get("SERVER_USERNAME", "admin")
+    return f"ssh {user}@pro.pinggy.io -p <port>"
 
 def format_uptime(seconds):
     seconds = int(seconds)
@@ -231,7 +232,7 @@ def telegram_poll_worker():
                         cpu = psutil.cpu_percent(interval=0.2)
                         ram = psutil.virtual_memory()
                         cf_url = get_cloudflare_url()
-                        sshx_url = get_sshx_url()
+                        ssh_cmd = get_ssh_cmd()
                         
                         b1 = "🟢 RUNNING" if get_bot_proc("love-whispers") else "🔴 STOPPED"
                         b2 = "🟢 RUNNING" if get_bot_proc("packtogether") else "🔴 STOPPED"
@@ -245,7 +246,7 @@ def telegram_poll_worker():
                             f"❤️ Love Whispers: {b1}\n"
                             f"🎒 PackTogether: {b2}\n\n"
                             f"🌐 <b>Panel:</b> <a href=\"{cf_url}\">{cf_url}</a>\n"
-                            f"⚡ <b>Terminal:</b> <a href=\"{sshx_url}\">{sshx_url}</a>"
+                            f"💻 <b>SSH:</b> <code>{ssh_cmd}</code>"
                         )
                         send_telegram_msg(status_msg)
 
@@ -254,16 +255,16 @@ def telegram_poll_worker():
                         send_telegram_msg(f"🌐 <b>Web Control Panel:</b>\n<a href=\"{cf_url}\">{cf_url}</a>")
 
                     elif cmd in ["/ssh", "/terminal", "/sshx"]:
-                        sshx_url = get_sshx_url()
-                        send_telegram_msg(f"⚡ <b>Browser Web Terminal (sshx):</b>\n<a href=\"{sshx_url}\">{sshx_url}</a>")
+                        ssh_cmd = get_ssh_cmd()
+                        send_telegram_msg(f"💻 <b>SSH Terminal Access:</b>\n<code>{ssh_cmd}</code>")
 
                     elif cmd in ["/help", "/start"]:
                         help_msg = (
                             "<b>🤖 Server Control Commands:</b>\n\n"
                             "🔄 <code>/redeploy</code> - Trigger fresh workflow run & update server\n"
                             "📊 <code>/status</code> - Current CPU, RAM, and bot health\n"
-                            "🌐 <code>/panel</code> - Open Web Management Panel (Cloudflare)\n"
-                            "⚡ <code>/ssh</code> - Open Browser Terminal (sshx)"
+                            "🌐 <code>/panel</code> - Open Web Management Panel\n"
+                            "💻 <code>/ssh</code> - View SSH terminal access command"
                         )
                         send_telegram_msg(help_msg)
 
@@ -301,7 +302,7 @@ def status():
     disk = psutil.disk_usage("/")
     
     cf_url = get_cloudflare_url()
-    sshx_url = get_sshx_url()
+    ssh_cmd = get_ssh_cmd()
     
     bot_status = {}
     online_count = 0
@@ -334,7 +335,7 @@ def status():
             "disk_percent": disk.percent,
             "uptime": format_uptime(time.time() - START_TIME),
             "panel_url": cf_url,
-            "sshx_url": sshx_url
+            "ssh_command": ssh_cmd
         },
         "fleet": {
             "online": online_count,
