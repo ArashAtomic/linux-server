@@ -1,0 +1,110 @@
+name: Bot Server
+
+on:
+  schedule:
+    - cron: '0 */5 * * *'
+  workflow_dispatch:
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Make Scripts Executable
+        run: chmod +x scripts/*.sh
+
+      - name: Setup OpenSSH Server
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openssh-server
+          sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          sudo systemctl restart ssh
+
+      - name: Create SSH User with Root Access
+        env:
+          SSH_USER: ${{ vars.SERVER_USERNAME || secrets.SERVER_USERNAME || 'admin' }}
+          SSH_PASS: ${{ secrets.SERVER_PASSWORD || 'admin' }}
+        run: |
+          sudo useradd -m -s /bin/bash "$SSH_USER" || true
+          echo "$SSH_USER:$SSH_PASS" | sudo chpasswd
+          sudo usermod -aG sudo "$SSH_USER"
+          echo "$SSH_USER ALL=(ALL) NOPASSWD:ALL" | sudo tee "/etc/sudoers.d/$SSH_USER"
+
+      - name: Connect Tailscale VPN & Show Access Info
+        env:
+          TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+          SSH_USER: ${{ vars.SERVER_USERNAME || secrets.SERVER_USERNAME || 'admin' }}
+        run: |
+          if [ -z "$TAILSCALE_AUTHKEY" ]; then
+            echo "TAILSCALE_AUTHKEY is not configured. Skipping Tailscale setup."
+            exit 0
+          fi
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo tailscale up --authkey="$TAILSCALE_AUTHKEY" --hostname="bot-server" --accept-routes || true
+          TS_IP=$(tailscale ip -4 || true)
+          echo "=================================================="
+          echo "  >>> LINUX SSH SERVER IS LIVE! <<<"
+          echo "  Tailscale IP  : $TS_IP"
+          echo "  Username      : $SSH_USER"
+          echo "  Panel URL     : http://$TS_IP:8080"
+          echo "  ------------------------------------------------"
+          echo "  💻 Connect via PowerShell / CMD / Terminal:"
+          echo "  >> ssh $SSH_USER@$TS_IP"
+          echo "=================================================="
+
+      - name: Setup Environment
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          LOVE_WHISPERS_ENV: ${{ secrets.LOVE_WHISPERS_ENV }}
+          PACKTOGETHER_ENV: ${{ secrets.PACKTOGETHER_ENV }}
+        run: ./scripts/setup.sh
+
+      - name: Start Telegram Bots & Management Panel
+        env:
+          SSH_USER: ${{ vars.SERVER_USERNAME || secrets.SERVER_USERNAME || 'admin' }}
+        run: ./scripts/start-bots.sh
+
+      - name: Send Startup Notification to Telegram
+        env:
+          STATUS_BOT_TOKEN: ${{ secrets.STATUS_BOT_TOKEN }}
+          STATUS_CHAT_ID: ${{ secrets.STATUS_CHAT_ID }}
+          SSH_USER: ${{ vars.SERVER_USERNAME || secrets.SERVER_USERNAME || 'admin' }}
+        run: ./scripts/heartbeat.sh
+
+      - name: Keep Server Active (5 Hours)
+        run: |
+          echo "Server running for 5 hours (300 minutes)..."
+          for i in {1..300}; do
+            sleep 60
+            if [ $((i % 30)) -eq 0 ]; then
+              echo "[$i/300m] Server is active and operational."
+            fi
+          done
+
+      - name: Stop Bots & Panel
+        if: always()
+        run: ./scripts/stop-bots.sh
+
+      - name: Upload Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-server-logs-${{ github.run_id }}
+          path: |
+            /tmp/love-whispers.log
+            /tmp/packtogether.log
+            /tmp/panel.log
+          if-no-files-found: warn
+
+      - name: Trigger Next Workflow Run
+        if: always()
+        run: |
+          echo "Triggering next workflow run to keep server active..."
+          gh workflow run server.yml --ref ${{ github.ref }} || true
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}

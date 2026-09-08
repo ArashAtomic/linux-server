@@ -1,0 +1,7 @@
+.hermes/
+.venv/
+/tmp/
+*.log
+*.pid
+.env
+__pycache__/
