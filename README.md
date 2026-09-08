@@ -41,7 +41,7 @@ repository/
   - `🌐 /panel` - Direct link to the Web Management Panel.
   - `💻 /ssh` - Direct SSH connection command.
 - **Continuous 24/7 Uptime**:
-  - 5-hour runner cycle with automated handoff triggering the next GitHub Actions workflow.
+  - 5-hour and 45-minute runner cycle with automated handoff triggering the next GitHub Actions workflow.
 
 ## SSH & Web Panel Access
 

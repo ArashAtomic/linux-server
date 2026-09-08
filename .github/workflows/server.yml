@@ -2,13 +2,13 @@ name: Bot Server
 
 on:
   schedule:
-    - cron: '0 */5 * * *'
+    - cron: '45 */5 * * *'
   workflow_dispatch:
 
 jobs:
   server:
     runs-on: ubuntu-latest
-    timeout-minutes: 330
+    timeout-minutes: 355
 
     steps:
       - name: Checkout Repository
@@ -81,10 +81,10 @@ jobs:
           SSH_USER: ${{ vars.SERVER_USERNAME || secrets.SERVER_USERNAME || 'admin' }}
         run: ./scripts/heartbeat.sh
 
-      - name: Keep Server Active (5 Hours or until Redeploy)
+      - name: Keep Server Active (5h 45m or until Redeploy)
         run: |
-          echo "Server running for 5 hours (18000s). Checking for early redeploy trigger..."
-          TOTAL_SECONDS=18000
+          echo "Server running for 5 hours 45 minutes (20700s). Checking for early redeploy trigger..."
+          TOTAL_SECONDS=20700
           ELAPSED=0
           while [ $ELAPSED -lt $TOTAL_SECONDS ]; do
             if [ -f /tmp/redeploy.trigger ]; then
@@ -95,7 +95,7 @@ jobs:
             ELAPSED=$((ELAPSED + 2))
             if [ $((ELAPSED % 1800)) -eq 0 ]; then
               MINS=$((ELAPSED / 60))
-              echo "[$MINS/300m] Server is active and operational."
+              echo "[$MINS/345m] Server is active and operational."
             fi
           done
 
@@ -120,7 +120,7 @@ jobs:
           if [ -f /tmp/redeploy.trigger ]; then
             echo "Redeploy already scheduled by trigger. Skipping duplicate dispatch."
           else
-            echo "5-hour session finished. Triggering next workflow run..."
+            echo "5h 45m session finished. Triggering next workflow run..."
             gh workflow run server.yml --ref ${{ github.ref }} || true
           fi
         env:

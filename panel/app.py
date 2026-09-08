@@ -70,9 +70,9 @@ def format_uptime(seconds):
         return f"{minutes}m {secs}s"
     return f"{secs}s"
 
-def send_telegram_msg(message):
+def send_telegram_msg(message, target_chat_id=None):
     token = os.environ.get("STATUS_BOT_TOKEN")
-    chat_id = os.environ.get("STATUS_CHAT_ID")
+    chat_id = target_chat_id or os.environ.get("STATUS_CHAT_ID")
     if not token or not chat_id:
         return
     
@@ -157,8 +157,9 @@ def telegram_poll_worker():
                     chat_id = str(chat.get("id", ""))
                     text = msg.get("text", "").strip()
 
-                    # Only respond to authorized chat ID
+                    # If unauthorized chat ID, inform them the bot is private
                     if chat_id != allowed_chat_id:
+                        send_telegram_msg("🔒 This bot is private.", target_chat_id=chat_id)
                         continue
 
                     cmd = text.split()[0].lower() if text else ""
