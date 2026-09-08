@@ -17,45 +17,11 @@ jobs:
       - name: Make Scripts Executable
         run: chmod +x scripts/*.sh
 
-      - name: Setup OpenSSH Server
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y openssh-server
-          sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
-          sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
-          sudo systemctl restart ssh
-
-      - name: Create SSH User with Root Access
-        env:
-          SSH_USER: ${{ vars.SERVER_USERNAME || secrets.SERVER_USERNAME || 'admin' }}
-          SSH_PASS: ${{ secrets.SERVER_PASSWORD || 'admin' }}
-        run: |
-          sudo useradd -m -s /bin/bash "$SSH_USER" || true
-          echo "$SSH_USER:$SSH_PASS" | sudo chpasswd
-          sudo usermod -aG sudo "$SSH_USER"
-          echo "$SSH_USER ALL=(ALL) NOPASSWD:ALL" | sudo tee "/etc/sudoers.d/$SSH_USER"
-
-      - name: Connect Tailscale VPN & Show Access Info
-        env:
-          TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
-          SSH_USER: ${{ vars.SERVER_USERNAME || secrets.SERVER_USERNAME || 'admin' }}
-        run: |
-          if [ -z "$TAILSCALE_AUTHKEY" ]; then
-            echo "TAILSCALE_AUTHKEY is not configured. Skipping Tailscale setup."
-            exit 0
-          fi
-          curl -fsSL https://tailscale.com/install.sh | sh
-          sudo tailscale up --authkey="$TAILSCALE_AUTHKEY" --hostname="bot-server" --accept-routes || true
-          TS_IP=$(tailscale ip -4 || true)
-          echo "=================================================="
-          echo "  >>> LINUX SSH SERVER IS LIVE! <<<"
-          echo "  Tailscale IP  : $TS_IP"
-          echo "  Username      : $SSH_USER"
-          echo "  Panel URL     : http://$TS_IP:8080"
-          echo "  ------------------------------------------------"
-          echo "  💻 Connect via PowerShell / CMD / Terminal:"
-          echo "  >> ssh $SSH_USER@$TS_IP"
-          echo "=================================================="
+      - name: Restore Persistent Bot State
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/bot-server/state.json
+          key: bot-server-state-persistent
 
       - name: Setup Environment
         env:
@@ -64,9 +30,10 @@ jobs:
           PACKTOGETHER_ENV: ${{ secrets.PACKTOGETHER_ENV }}
         run: ./scripts/setup.sh
 
-      - name: Start Telegram Bots & Management Panel
+      - name: Start Telegram Bots, Panel & Tunnels
         env:
-          SSH_USER: ${{ vars.SERVER_USERNAME || secrets.SERVER_USERNAME || 'admin' }}
+          SERVER_USERNAME: ${{ vars.SERVER_USERNAME || secrets.SERVER_USERNAME || 'admin' }}
+          SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD || 'admin' }}
           GH_PAT: ${{ secrets.GH_PAT }}
           STATUS_BOT_TOKEN: ${{ secrets.STATUS_BOT_TOKEN }}
           STATUS_CHAT_ID: ${{ secrets.STATUS_CHAT_ID }}
@@ -78,7 +45,7 @@ jobs:
         env:
           STATUS_BOT_TOKEN: ${{ secrets.STATUS_BOT_TOKEN }}
           STATUS_CHAT_ID: ${{ secrets.STATUS_CHAT_ID }}
-          SSH_USER: ${{ vars.SERVER_USERNAME || secrets.SERVER_USERNAME || 'admin' }}
+          SERVER_USERNAME: ${{ vars.SERVER_USERNAME || secrets.SERVER_USERNAME || 'admin' }}
         run: ./scripts/heartbeat.sh
 
       - name: Keep Server Active (5h 45m or until Redeploy)
@@ -99,9 +66,16 @@ jobs:
             fi
           done
 
-      - name: Stop Bots & Panel
+      - name: Stop Bots, Panel & Tunnels
         if: always()
         run: ./scripts/stop-bots.sh
+
+      - name: Save Persistent Bot State
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: /home/runner/bot-server/state.json
+          key: bot-server-state-persistent-${{ github.run_id }}
 
       - name: Upload Logs
         if: always()
@@ -112,6 +86,8 @@ jobs:
             /tmp/love-whispers.log
             /tmp/packtogether.log
             /tmp/panel.log
+            /tmp/cloudflared.log
+            /tmp/sshx.log
           if-no-files-found: warn
 
       - name: Trigger Next Workflow Run (if not redeploying)

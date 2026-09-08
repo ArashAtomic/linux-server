@@ -39,6 +39,14 @@ sudo apt-get install -y \
     unzip
 
 echo
+echo "==> Installing cloudflared & sshx"
+curl -L --output /tmp/cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+sudo dpkg -i /tmp/cloudflared.deb || sudo apt-get install -f -y
+rm -f /tmp/cloudflared.deb
+
+curl -sSf https://sshx.io/get | sh || true
+
+echo
 echo "==> Installing Python 3.12"
 
 sudo add-apt-repository -y ppa:deadsnakes/ppa

@@ -1,17 +1,21 @@
 import os
 import time
 import signal
+import secrets
 import threading
 import subprocess
 import json
 import urllib.request
 import urllib.parse
-from flask import Flask, jsonify, render_template, request
+from functools import wraps
+from flask import Flask, jsonify, render_template, request, session, redirect, url_for
 import psutil
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
 
 BASE_DIR = os.path.expanduser("~/bot-server")
+STATE_FILE = os.path.join(BASE_DIR, "state.json")
 START_TIME = time.time()
 
 BOTS = {
@@ -38,6 +42,46 @@ RESTART_COUNTS = {
     "packtogether": 0
 }
 
+def load_bot_state():
+    state = {"love-whispers": True, "packtogether": True}
+    if os.path.exists(STATE_FILE):
+        try:
+            with open(STATE_FILE, "r") as f:
+                saved = json.load(f)
+                if isinstance(saved, dict):
+                    state.update(saved)
+        except Exception:
+            pass
+    return state
+
+def save_bot_state(state):
+    try:
+        os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+        with open(STATE_FILE, "w") as f:
+            json.dump(state, f, indent=2)
+    except Exception as e:
+        print(f"Failed to save state: {e}")
+
+def set_bot_enabled(bot_key, enabled):
+    state = load_bot_state()
+    state[bot_key] = bool(enabled)
+    save_bot_state(state)
+
+def get_auth_credentials():
+    user = os.environ.get("SERVER_USERNAME", "admin")
+    pwd = os.environ.get("SERVER_PASSWORD", "admin")
+    return user, pwd
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get("logged_in"):
+            if request.path.startswith("/api/"):
+                return jsonify({"error": "Unauthorized"}), 401
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated_function
+
 def get_bot_proc(bot_key):
     pid_path = BOTS[bot_key]["pid_path"]
     if os.path.exists(pid_path):
@@ -52,12 +96,27 @@ def get_bot_proc(bot_key):
             pass
     return None
 
-def get_tailscale_ip():
-    try:
-        out = subprocess.check_output(["tailscale", "ip", "-4"], text=True, timeout=3).strip()
-        return out if out else "127.0.0.1"
-    except Exception:
-        return "127.0.0.1"
+def get_cloudflare_url():
+    if os.path.exists("/tmp/cloudflared.url"):
+        try:
+            with open("/tmp/cloudflared.url", "r") as f:
+                url = f.read().strip()
+                if url.startswith("https://"):
+                    return url
+        except Exception:
+            pass
+    return "http://localhost:8080"
+
+def get_sshx_url():
+    if os.path.exists("/tmp/sshx.url"):
+        try:
+            with open("/tmp/sshx.url", "r") as f:
+                url = f.read().strip()
+                if url.startswith("https://"):
+                    return url
+        except Exception:
+            pass
+    return "Pending sshx..."
 
 def format_uptime(seconds):
     seconds = int(seconds)
@@ -94,11 +153,9 @@ def trigger_github_redeploy(source="User"):
     repo = os.environ.get("GITHUB_REPO", "ArashAtomic/linux-server")
     ref = os.environ.get("GITHUB_REF_NAME", "main")
 
-    # Mark trigger file so current workflow exits keep-alive cleanly
     with open("/tmp/redeploy.trigger", "w") as f:
         f.write(f"triggered by {source} at {time.time()}\n")
 
-    # Dispatch new workflow run
     dispatched = False
     if pat and repo:
         url = f"https://api.github.com/repos/{repo}/actions/workflows/server.yml/dispatches"
@@ -121,18 +178,16 @@ def trigger_github_redeploy(source="User"):
             print(f"GitHub API dispatch error: {e}")
 
     if not dispatched:
-        # Fallback to local gh CLI if available
         try:
             subprocess.run(["gh", "workflow", "run", "server.yml", "--ref", ref], check=True, timeout=10)
             dispatched = True
         except Exception as e:
             print(f"gh CLI fallback error: {e}")
 
-    msg = f"🔄 <b>Server Redeploy Triggered ({source})</b>\n\nA new GitHub Actions workflow run has been started with the latest code. The current server will shut down shortly."
+    msg = f"🔄 <b>Server Redeploy Triggered ({source})</b>\n\nA fresh GitHub Actions runner instance is starting. The current server will shut down shortly."
     send_telegram_msg(msg)
     return dispatched
 
-# Background Telegram Bot Command Listener
 def telegram_poll_worker():
     token = os.environ.get("STATUS_BOT_TOKEN")
     allowed_chat_id = str(os.environ.get("STATUS_CHAT_ID", ""))
@@ -157,7 +212,6 @@ def telegram_poll_worker():
                     chat_id = str(chat.get("id", ""))
                     text = msg.get("text", "").strip()
 
-                    # If unauthorized chat ID, inform them the bot is private
                     if chat_id != allowed_chat_id:
                         send_telegram_msg("🔒 This bot is private.", target_chat_id=chat_id)
                         continue
@@ -171,7 +225,8 @@ def telegram_poll_worker():
                     elif cmd in ["/status", "/ping"]:
                         cpu = psutil.cpu_percent(interval=0.2)
                         ram = psutil.virtual_memory()
-                        ts_ip = get_tailscale_ip()
+                        cf_url = get_cloudflare_url()
+                        sshx_url = get_sshx_url()
                         
                         b1 = "🟢 RUNNING" if get_bot_proc("love-whispers") else "🔴 STOPPED"
                         b2 = "🟢 RUNNING" if get_bot_proc("packtogether") else "🔴 STOPPED"
@@ -179,49 +234,69 @@ def telegram_poll_worker():
                         status_msg = (
                             f"<b>🖥️ Server Status</b>\n\n"
                             f"⏱ Uptime: {format_uptime(time.time() - START_TIME)}\n"
-                            f"🌐 IP: <code>{ts_ip}</code>\n"
                             f"💻 CPU: {cpu}%\n"
                             f"🧠 RAM: {round(ram.used/(1024**3), 2)} / {round(ram.total/(1024**3), 2)} GB\n\n"
                             f"<b>Bots:</b>\n"
                             f"❤️ Love Whispers: {b1}\n"
-                            f"🎒 PackTogether: {b2}"
+                            f"🎒 PackTogether: {b2}\n\n"
+                            f"🌐 <b>Panel:</b> <a href=\"{cf_url}\">{cf_url}</a>\n"
+                            f"⚡ <b>Terminal:</b> <a href=\"{sshx_url}\">{sshx_url}</a>"
                         )
                         send_telegram_msg(status_msg)
 
                     elif cmd == "/panel":
-                        ts_ip = get_tailscale_ip()
-                        send_telegram_msg(f"🌐 <b>Web Control Panel:</b>\n<a href=\"http://{ts_ip}:8080\">http://{ts_ip}:8080</a>")
+                        cf_url = get_cloudflare_url()
+                        send_telegram_msg(f"🌐 <b>Web Control Panel:</b>\n<a href=\"{cf_url}\">{cf_url}</a>")
 
-                    elif cmd == "/ssh":
-                        ts_ip = get_tailscale_ip()
-                        user = os.environ.get("SSH_USER", "admin")
-                        send_telegram_msg(f"💻 <b>SSH Connection:</b>\n<code>ssh {user}@{ts_ip}</code>")
+                    elif cmd in ["/ssh", "/terminal", "/sshx"]:
+                        sshx_url = get_sshx_url()
+                        send_telegram_msg(f"⚡ <b>Browser Web Terminal (sshx):</b>\n<a href=\"{sshx_url}\">{sshx_url}</a>")
 
                     elif cmd in ["/help", "/start"]:
                         help_msg = (
                             "<b>🤖 Server Control Commands:</b>\n\n"
                             "🔄 <code>/redeploy</code> - Trigger fresh workflow run & update server\n"
                             "📊 <code>/status</code> - Current CPU, RAM, and bot health\n"
-                            "🌐 <code>/panel</code> - Open Web Management Panel\n"
-                            "💻 <code>/ssh</code> - View SSH terminal access command"
+                            "🌐 <code>/panel</code> - Open Web Management Panel (Cloudflare)\n"
+                            "⚡ <code>/ssh</code> - Open Browser Terminal (sshx)"
                         )
                         send_telegram_msg(help_msg)
 
         except Exception as e:
             time.sleep(5)
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    expected_user, expected_pass = get_auth_credentials()
+    if request.method == "POST":
+        user = request.form.get("username", "")
+        pwd = request.form.get("password", "")
+        if user == expected_user and pwd == expected_pass:
+            session["logged_in"] = True
+            return redirect(url_for("index"))
+        error = "Invalid username or password."
+    return render_template("login.html", error=error)
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
 @app.route("/")
+@login_required
 def index():
     return render_template("index.html")
 
 @app.route("/api/status")
+@login_required
 def status():
     cpu = psutil.cpu_percent(interval=0.2)
     ram = psutil.virtual_memory()
     disk = psutil.disk_usage("/")
     
-    ts_ip = get_tailscale_ip()
-    ssh_user = os.environ.get("SSH_USER", "admin")
+    cf_url = get_cloudflare_url()
+    sshx_url = get_sshx_url()
     
     bot_status = {}
     online_count = 0
@@ -253,9 +328,8 @@ def status():
             "ram_percent": ram.percent,
             "disk_percent": disk.percent,
             "uptime": format_uptime(time.time() - START_TIME),
-            "tailscale_ip": ts_ip,
-            "ssh_command": f"ssh {ssh_user}@{ts_ip}",
-            "panel_url": f"http://{ts_ip}:8080"
+            "panel_url": cf_url,
+            "sshx_url": sshx_url
         },
         "fleet": {
             "online": online_count,
@@ -265,14 +339,16 @@ def status():
     })
 
 @app.route("/api/server/redeploy", methods=["POST"])
+@login_required
 def redeploy_server():
-    success = trigger_github_redeploy(source="Web Panel")
+    trigger_github_redeploy(source="Web Panel")
     return jsonify({
         "success": True,
         "message": "Server redeploy initiated. Fresh GitHub runner is launching with the latest code."
     })
 
 @app.route("/api/logs/<bot_key>")
+@login_required
 def get_logs(bot_key):
     if bot_key not in BOTS and bot_key != "panel":
         return jsonify({"error": "Unknown log target"}), 404
@@ -290,6 +366,7 @@ def get_logs(bot_key):
     return jsonify({"logs": "Log file not found or empty.", "total_lines": 0})
 
 @app.route("/api/env/<bot_key>")
+@login_required
 def get_env(bot_key):
     if bot_key not in BOTS:
         return jsonify({"error": "Unknown bot"}), 404
@@ -306,6 +383,7 @@ def get_env(bot_key):
     return jsonify({"env": env_vars, "count": len(env_vars)})
 
 @app.route("/api/bot/<bot_key>/<action>", methods=["POST"])
+@login_required
 def control_bot(bot_key, action):
     if bot_key not in BOTS:
         return jsonify({"error": "Unknown bot"}), 404
@@ -314,6 +392,8 @@ def control_bot(bot_key, action):
     proc = get_bot_proc(bot_key)
 
     if action in ["stop", "restart"]:
+        if action == "stop":
+            set_bot_enabled(bot_key, False)
         if proc:
             try:
                 proc.terminate()
@@ -333,6 +413,7 @@ def control_bot(bot_key, action):
             return jsonify({"success": True, "message": f"{info['name']} stopped"})
 
     if action in ["start", "restart"]:
+        set_bot_enabled(bot_key, True)
         if action == "restart":
             RESTART_COUNTS[bot_key] += 1
 
@@ -344,6 +425,7 @@ def control_bot(bot_key, action):
     return jsonify({"error": "Invalid action"}), 400
 
 @app.route("/api/files")
+@login_required
 def list_files():
     req_path = request.args.get("path")
     if not req_path:
@@ -390,6 +472,7 @@ def list_files():
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/file/content")
+@login_required
 def file_content():
     req_path = request.args.get("path", "")
     target_path = os.path.abspath(req_path)

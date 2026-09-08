@@ -3,7 +3,7 @@
 set +e
 
 echo "======================================"
-echo "Stopping server processes"
+echo "Stopping server processes & tunnels"
 echo "======================================"
 
 stop_process() {
@@ -45,6 +45,10 @@ stop_process() {
 stop_process "Love Whispers" "/tmp/love-whispers.pid"
 stop_process "PackTogether" "/tmp/packtogether.pid"
 stop_process "Management Panel" "/tmp/panel.pid"
+stop_process "Cloudflare Tunnel" "/tmp/cloudflared.pid"
+stop_process "sshx Terminal" "/tmp/sshx.pid"
+
+rm -f /tmp/cloudflared.url /tmp/sshx.url
 
 echo
 echo "All processes stopped."

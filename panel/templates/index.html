@@ -139,7 +139,7 @@
             border: 1px solid var(--border-light); border-radius: 7px; padding: 8px 12px;
             color: var(--text-secondary); background: rgba(255,255,255,.025); cursor: pointer;
             font-size: 11px; font-weight: 700; transition: background .15s, color .15s;
-            display: inline-flex; align-items: center; gap: 5px;
+            display: inline-flex; align-items: center; gap: 5px; text-decoration: none;
         }
         .btn:hover:not(:disabled) { background: rgba(255,255,255,.06); color: var(--text); }
         .btn-start { color: var(--green); border-color: rgba(52,211,153,.22); }
@@ -204,6 +204,7 @@
         </div>
         <div class="header-meta">
             <button class="btn btn-restart" style="padding: 7px 12px;" onclick="redeployServer()">🔄 Redeploy Server</button>
+            <a href="/logout" class="btn btn-stop" style="padding: 7px 12px;">🚪 Logout</a>
             <div class="system-pill">
                 <span id="connection-dot" class="system-dot"></span>
                 <span id="connection-status">CONNECTED</span>
@@ -254,12 +255,12 @@
 
             <div class="panel metric-card">
                 <div class="metric-top">
-                    <div class="metric-label">SSH Access</div>
+                    <div class="metric-label">Browser Terminal</div>
                     <div class="metric-icon">⚡</div>
                 </div>
-                <div class="metric-value" style="font-size: 13px;" id="ssh-val">ssh admin@...</div>
+                <div class="metric-value" style="font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="sshx-val">sshx terminal...</div>
                 <div class="metric-detail">
-                    <button class="btn" style="padding: 3px 8px; margin-top: 5px;" onclick="copySSH()">📋 Copy SSH Cmd</button>
+                    <button class="btn" style="padding: 3px 8px; margin-top: 5px;" onclick="openSSHX()">🔗 Open Terminal</button>
                 </div>
             </div>
         </div>
@@ -398,7 +399,7 @@
     let envData = {};
     let rawLogs = '';
     let paused = false;
-    let sshCmd = '';
+    let sshxUrl = '';
     let currentPath = '';
 
     function showToast(msg, type = 'success') {
@@ -413,7 +414,10 @@
     async function fetchStatus() {
         try {
             const res = await fetch('/api/status', { cache: 'no-store' });
-            if (!res.ok) return;
+            if (!res.ok) {
+                if (res.status === 401) window.location.href = '/login';
+                return;
+            }
             const data = await res.json();
 
             document.getElementById('cpu-val').innerText = `${Math.round(data.system.cpu_percent)}%`;
@@ -427,8 +431,8 @@
             document.getElementById('fleet-progress').style.width = `${(data.fleet.online / data.fleet.total) * 100}%`;
 
             document.getElementById('uptime-val').innerText = `Uptime: ${data.system.uptime}`;
-            document.getElementById('ssh-val').innerText = data.system.ssh_command;
-            sshCmd = data.system.ssh_command;
+            document.getElementById('sshx-val').innerText = data.system.sshx_url;
+            sshxUrl = data.system.sshx_url;
 
             for (const [key, bot] of Object.entries(data.bots)) {
                 const statusEl = document.getElementById(`status-${key}`);
@@ -581,10 +585,11 @@
         } catch (e) { showToast("Failed to perform action", 'error'); }
     }
 
-    function copySSH() {
-        if (sshCmd) {
-            navigator.clipboard.writeText(sshCmd);
-            showToast("SSH command copied to clipboard!");
+    function openSSHX() {
+        if (sshxUrl && sshxUrl.startsWith('https://')) {
+            window.open(sshxUrl, '_blank');
+        } else {
+            showToast("sshx session URL is not ready yet.", "error");
         }
     }
 

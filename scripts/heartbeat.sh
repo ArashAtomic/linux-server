@@ -52,12 +52,17 @@ bot_status_plain() {
     echo "🔴 $NAME: STOPPED"
 }
 
-get_tailscale_ip() {
-    tailscale ip -4 2>/dev/null || echo "127.0.0.1"
-}
+CF_URL="Pending Cloudflare..."
+if [ -f /tmp/cloudflared.url ]; then
+    CF_URL=$(cat /tmp/cloudflared.url)
+fi
 
-TS_IP=$(get_tailscale_ip)
-SSH_USER="${SSH_USER:-admin}"
+SSHX_URL="Pending sshx..."
+if [ -f /tmp/sshx.url ]; then
+    SSHX_URL=$(cat /tmp/sshx.url)
+fi
+
+USER_NAME="${SERVER_USERNAME:-admin}"
 NOW=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
 STATUS_LOVE=$(bot_status_plain "❤️ Love Whispers" "/tmp/love-whispers.pid")
 STATUS_PACK=$(bot_status_plain "🎒 PackTogether" "/tmp/packtogether.pid")
@@ -67,11 +72,12 @@ RAM_INFO=$(get_memory)
 
 TELEGRAM_MSG="<b>🚀 BOT SERVER IS ONLINE</b>
 
-<b>🌐 Web Control Panel</b>
-<a href=\"http://${TS_IP}:8080\">http://${TS_IP}:8080</a>
+<b>🌐 Web Control Panel (Cloudflare)</b>
+<a href=\"${CF_URL}\">${CF_URL}</a>
+<i>Username:</i> <code>${USER_NAME}</code>
 
-<b>💻 SSH Terminal Access</b>
-<code>ssh ${SSH_USER}@${TS_IP}</code>
+<b>⚡ Browser Terminal (sshx)</b>
+<a href=\"${SSHX_URL}\">${SSHX_URL}</a>
 
 <b>🤖 Bot Status</b>
 ${STATUS_LOVE}
@@ -85,8 +91,9 @@ Started at: ${NOW}"
 
 PLAIN_MSG="==================================================
   🚀 BOT SERVER IS ONLINE
-  🌐 Web Control Panel  : http://${TS_IP}:8080
-  💻 SSH Terminal Access : ssh ${SSH_USER}@${TS_IP}
+  🌐 Web Control Panel  : ${CF_URL}
+  ⚡ Browser Terminal   : ${SSHX_URL}
+  👤 Panel Username      : ${USER_NAME}
   ------------------------------------------------
   🤖 Bot Status:
     ${STATUS_LOVE}
