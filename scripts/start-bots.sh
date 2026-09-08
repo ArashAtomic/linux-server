@@ -82,24 +82,28 @@ echo "Management Panel PID: $PANEL_PID (Port 8080)"
 # Start Cloudflare Tunnel for Web Panel
 echo
 echo "==> Starting Cloudflare Tunnel"
-nohup cloudflared tunnel --url http://localhost:8080 > /tmp/cloudflared.log 2>&1 &
+nohup cloudflared tunnel --url http://127.0.0.1:8080 --no-autoupdate > /tmp/cloudflared.log 2>&1 &
 CF_PID=$!
 echo "$CF_PID" > /tmp/cloudflared.pid
 
 # Start sshx Web Terminal
 echo
 echo "==> Starting sshx Web Terminal"
-nohup sshx > /tmp/sshx.log 2>&1 &
+nohup /usr/local/bin/sshx > /tmp/sshx.log 2>&1 || nohup ~/.local/bin/sshx > /tmp/sshx.log 2>&1 || nohup sshx > /tmp/sshx.log 2>&1 &
 SSHX_PID=$!
 echo "$SSHX_PID" > /tmp/sshx.pid
 
 echo "Waiting for public tunnel URLs..."
-for i in {1..15}; do
-    if [ ! -f /tmp/cloudflared.url ]; then
-        grep -o 'https://[-a-zA-Z0-0.]*\.trycloudflare\.com' /tmp/cloudflared.log | head -n 1 > /tmp/cloudflared.url || true
+for i in {1..20}; do
+    if [ ! -s /tmp/cloudflared.url ]; then
+        if [ -f /tmp/cloudflared.log ]; then
+            grep -oiE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' /tmp/cloudflared.log | head -n 1 > /tmp/cloudflared.url || true
+        fi
     fi
-    if [ ! -f /tmp/sshx.url ]; then
-        grep -o 'https://sshx\.io/s/[-a-zA-Z0-9#]*' /tmp/sshx.log | head -n 1 > /tmp/sshx.url || true
+    if [ ! -s /tmp/sshx.url ]; then
+        if [ -f /tmp/sshx.log ]; then
+            grep -oiE 'https://sshx\.io/s/[a-zA-Z0-9#-]+' /tmp/sshx.log | head -n 1 > /tmp/sshx.url || true
+        fi
     fi
     if [ -s /tmp/cloudflared.url ] && [ -s /tmp/sshx.url ]; then
         break
@@ -112,12 +116,18 @@ echo "======================================"
 echo "Processes and Tunnels Active"
 echo "======================================"
 
-if [ -f /tmp/cloudflared.url ]; then
+if [ -s /tmp/cloudflared.url ]; then
     echo "Cloudflare Panel URL: $(cat /tmp/cloudflared.url)"
+else
+    echo "WARNING: Cloudflare URL not ready. Log:"
+    tail -n 10 /tmp/cloudflared.log || true
 fi
 
-if [ -f /tmp/sshx.url ]; then
+if [ -s /tmp/sshx.url ]; then
     echo "sshx Terminal URL: $(cat /tmp/sshx.url)"
+else
+    echo "WARNING: sshx URL not ready. Log:"
+    tail -n 10 /tmp/sshx.log || true
 fi
 
 sleep 2

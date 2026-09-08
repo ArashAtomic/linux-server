@@ -52,13 +52,21 @@ bot_status_plain() {
     echo "🔴 $NAME: STOPPED"
 }
 
+# Wait up to 10 extra seconds for tunnels if not yet written
+for i in {1..10}; do
+    if [ -s /tmp/cloudflared.url ] && [ -s /tmp/sshx.url ]; then
+        break
+    fi
+    sleep 1
+done
+
 CF_URL="Pending Cloudflare..."
-if [ -f /tmp/cloudflared.url ]; then
+if [ -s /tmp/cloudflared.url ]; then
     CF_URL=$(cat /tmp/cloudflared.url)
 fi
 
 SSHX_URL="Pending sshx..."
-if [ -f /tmp/sshx.url ]; then
+if [ -s /tmp/sshx.url ]; then
     SSHX_URL=$(cat /tmp/sshx.url)
 fi
 
@@ -66,7 +74,6 @@ USER_NAME="${SERVER_USERNAME:-admin}"
 NOW=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
 STATUS_LOVE=$(bot_status_plain "❤️ Love Whispers" "/tmp/love-whispers.pid")
 STATUS_PACK=$(bot_status_plain "🎒 PackTogether" "/tmp/packtogether.pid")
-STATUS_PANEL=$(bot_status_plain "🖥️ Control Panel" "/tmp/panel.pid")
 CPU_INFO=$(get_cpu)
 RAM_INFO=$(get_memory)
 
@@ -82,7 +89,6 @@ TELEGRAM_MSG="<b>🚀 BOT SERVER IS ONLINE</b>
 <b>🤖 Bot Status</b>
 ${STATUS_LOVE}
 ${STATUS_PACK}
-${STATUS_PANEL}
 
 <b>📊 System Resources</b>
 CPU load: ${CPU_INFO}
@@ -98,7 +104,6 @@ PLAIN_MSG="==================================================
   🤖 Bot Status:
     ${STATUS_LOVE}
     ${STATUS_PACK}
-    ${STATUS_PANEL}
   ------------------------------------------------
   📊 System Resources:
     CPU load: ${CPU_INFO}

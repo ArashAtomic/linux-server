@@ -39,12 +39,16 @@ sudo apt-get install -y \
     unzip
 
 echo
-echo "==> Installing cloudflared & sshx"
-curl -L --output /tmp/cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+echo "==> Installing cloudflared"
+curl -fsSL --output /tmp/cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
 sudo dpkg -i /tmp/cloudflared.deb || sudo apt-get install -f -y
 rm -f /tmp/cloudflared.deb
+cloudflared --version
 
-curl -sSf https://sshx.io/get | sh || true
+echo
+echo "==> Installing sshx"
+curl -sSf https://sshx.io/get | sudo sh -s -- --dir /usr/local/bin || curl -sSf https://sshx.io/get | sh || true
+which sshx || echo "sshx binary path check"
 
 echo
 echo "==> Installing Python 3.12"
