@@ -86,16 +86,21 @@ nohup cloudflared tunnel --url http://127.0.0.1:8080 --no-autoupdate > /tmp/clou
 CF_PID=$!
 echo "$CF_PID" > /tmp/cloudflared.pid
 
+# Generate SSH key pair for tmate if missing
+if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
+    mkdir -p "$HOME/.ssh"
+    ssh-keygen -t ed25519 -f "$HOME/.ssh/id_ed25519" -N "" -q
+fi
+
 # Start tmate SSH Terminal
 echo
 echo "==> Starting tmate SSH Session"
 rm -f /tmp/tmate.sock /tmp/ssh_cmd.txt
 tmate -S /tmp/tmate.sock new-session -d || true
 tmate -S /tmp/tmate.sock wait-for-ready || true
-tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}' > /tmp/ssh_cmd.txt || true
 
 echo "Waiting for public tunnel endpoints..."
-for i in {1..20}; do
+for i in {1..25}; do
     if [ ! -s /tmp/cloudflared.url ]; then
         if [ -f /tmp/cloudflared.log ]; then
             grep -oiE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' /tmp/cloudflared.log | head -n 1 > /tmp/cloudflared.url || true
@@ -103,7 +108,10 @@ for i in {1..20}; do
     fi
 
     if [ ! -s /tmp/ssh_cmd.txt ]; then
-        tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}' > /tmp/ssh_cmd.txt 2>/dev/null || true
+        TM_CMD=$(tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}' 2>/dev/null || true)
+        if [[ "$TM_CMD" == ssh* ]]; then
+            echo "$TM_CMD" > /tmp/ssh_cmd.txt
+        fi
     fi
 
     if [ -s /tmp/cloudflared.url ] && [ -s /tmp/ssh_cmd.txt ]; then

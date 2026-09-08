@@ -67,7 +67,10 @@ fi
 
 SSH_CMD="Pending SSH command..."
 if [ -s /tmp/ssh_cmd.txt ]; then
-    SSH_CMD=$(cat /tmp/ssh_cmd.txt)
+    RAW_SSH=$(cat /tmp/ssh_cmd.txt)
+    if [[ "$RAW_SSH" == ssh* ]]; then
+        SSH_CMD="$RAW_SSH"
+    fi
 fi
 
 USER_NAME="${SERVER_USERNAME:-admin}"
