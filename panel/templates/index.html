@@ -203,6 +203,7 @@
             </div>
         </div>
         <div class="header-meta">
+            <button class="btn btn-restart" style="padding: 7px 12px;" onclick="redeployServer()">🔄 Redeploy Server</button>
             <div class="system-pill">
                 <span id="connection-dot" class="system-dot"></span>
                 <span id="connection-status">CONNECTED</span>
@@ -584,6 +585,24 @@
         if (sshCmd) {
             navigator.clipboard.writeText(sshCmd);
             showToast("SSH command copied to clipboard!");
+        }
+    }
+
+    async function redeployServer() {
+        if (!confirm("Are you sure you want to redeploy the server?\n\nThis will launch a fresh GitHub runner instance with the latest code and gracefully terminate the current VM.")) {
+            return;
+        }
+        try {
+            showToast("Triggering server redeploy...", "success");
+            const res = await fetch('/api/server/redeploy', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                showToast("Redeploy initiated! Launching fresh GitHub runner...", "success");
+            } else {
+                showToast("Redeploy failed: " + (data.error || "Unknown error"), "error");
+            }
+        } catch (e) {
+            showToast("Redeploy request sent.", "success");
         }
     }
 

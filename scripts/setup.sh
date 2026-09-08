@@ -87,7 +87,7 @@ cd "$PANEL_DIR"
 python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-pip install flask psutil
+pip install flask psutil requests
 deactivate
 
 echo

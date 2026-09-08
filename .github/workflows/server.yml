@@ -67,6 +67,11 @@ jobs:
       - name: Start Telegram Bots & Management Panel
         env:
           SSH_USER: ${{ vars.SERVER_USERNAME || secrets.SERVER_USERNAME || 'admin' }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          STATUS_BOT_TOKEN: ${{ secrets.STATUS_BOT_TOKEN }}
+          STATUS_CHAT_ID: ${{ secrets.STATUS_CHAT_ID }}
+          GITHUB_REPO: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
         run: ./scripts/start-bots.sh
 
       - name: Send Startup Notification to Telegram
@@ -76,13 +81,21 @@ jobs:
           SSH_USER: ${{ vars.SERVER_USERNAME || secrets.SERVER_USERNAME || 'admin' }}
         run: ./scripts/heartbeat.sh
 
-      - name: Keep Server Active (5 Hours)
+      - name: Keep Server Active (5 Hours or until Redeploy)
         run: |
-          echo "Server running for 5 hours (300 minutes)..."
-          for i in {1..300}; do
-            sleep 60
-            if [ $((i % 30)) -eq 0 ]; then
-              echo "[$i/300m] Server is active and operational."
+          echo "Server running for 5 hours (18000s). Checking for early redeploy trigger..."
+          TOTAL_SECONDS=18000
+          ELAPSED=0
+          while [ $ELAPSED -lt $TOTAL_SECONDS ]; do
+            if [ -f /tmp/redeploy.trigger ]; then
+              echo ">> Redeploy triggered! Shutting down current server to allow new instance to take over..."
+              break
+            fi
+            sleep 2
+            ELAPSED=$((ELAPSED + 2))
+            if [ $((ELAPSED % 1800)) -eq 0 ]; then
+              MINS=$((ELAPSED / 60))
+              echo "[$MINS/300m] Server is active and operational."
             fi
           done
 
@@ -101,10 +114,14 @@ jobs:
             /tmp/panel.log
           if-no-files-found: warn
 
-      - name: Trigger Next Workflow Run
+      - name: Trigger Next Workflow Run (if not redeploying)
         if: always()
         run: |
-          echo "Triggering next workflow run to keep server active..."
-          gh workflow run server.yml --ref ${{ github.ref }} || true
+          if [ -f /tmp/redeploy.trigger ]; then
+            echo "Redeploy already scheduled by trigger. Skipping duplicate dispatch."
+          else
+            echo "5-hour session finished. Triggering next workflow run..."
+            gh workflow run server.yml --ref ${{ github.ref }} || true
+          fi
         env:
           GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}

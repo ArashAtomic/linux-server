@@ -55,6 +55,11 @@ cd "$PANEL_DIR"
 source .venv/bin/activate
 
 export SSH_USER="${SSH_USER:-admin}"
+export GH_PAT="${GH_PAT:-}"
+export STATUS_BOT_TOKEN="${STATUS_BOT_TOKEN:-}"
+export STATUS_CHAT_ID="${STATUS_CHAT_ID:-}"
+export GITHUB_REPO="${GITHUB_REPO:-ArashAtomic/linux-server}"
+export GITHUB_REF_NAME="${GITHUB_REF_NAME:-main}"
 
 nohup python -u app.py \
     > /tmp/panel.log 2>&1 &

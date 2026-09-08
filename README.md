@@ -1,6 +1,6 @@
 # Bot Server & Control Center
 
-Disposable GitHub Actions environment for running Telegram bots with a web-based GUI management panel, SSH access, and 24/7 auto-renewing runner architecture.
+Disposable GitHub Actions environment for running Telegram bots with a web-based GUI management panel, SSH access, interactive Telegram bot commands, and 24/7 auto-renewing runner architecture.
 
 ## Structure
 
@@ -29,13 +29,17 @@ repository/
 - **Web Control Panel (Port 8080)**:
   - Real-time CPU & RAM metrics.
   - Bot lifecycle management (Start, Restart, Stop).
+  - One-click **🔄 Redeploy Server** button to trigger a fresh GitHub runner with the latest code.
   - Live log streaming with search filter and pause/resume.
   - Environment variables viewer with secret masking toggle.
   - File Explorer for browsing directory contents and viewing source files.
   - Copyable SSH connection command.
-- **Direct Telegram Startup Notification**:
+- **Interactive Telegram Bot Commands**:
   - Automatically notifies your Telegram status chat when a new runner boots up.
-  - Includes direct links to the Web Panel (`http://<TAILSCALE_IP>:8080`) and SSH access command.
+  - `🔄 /redeploy` or `/restart` - Trigger a fresh GitHub Actions workflow run and update the server instantly.
+  - `📊 /status` - Real-time CPU/RAM stats and bot health.
+  - `🌐 /panel` - Direct link to the Web Management Panel.
+  - `💻 /ssh` - Direct SSH connection command.
 - **Continuous 24/7 Uptime**:
   - 5-hour runner cycle with automated handoff triggering the next GitHub Actions workflow.
 
@@ -67,11 +71,11 @@ When `TAILSCALE_AUTHKEY` is provided, the runner connects to your Tailscale VPN 
 |---|---|---|
 | `SERVER_PASSWORD` | SSH password (masked in logs) | `admin` |
 | `TAILSCALE_AUTHKEY` | Tailscale auth key for SSH and Web Panel access | None |
-| `GH_PAT` | Personal Access Token to clone private `love-whispers-bot` & dispatch next workflow | None |
+| `GH_PAT` | Personal Access Token to clone private `love-whispers-bot` & dispatch workflows | None |
 | `LOVE_WHISPERS_ENV` | Complete `.env` content for Love Whispers | None |
 | `PACKTOGETHER_ENV` | Complete `.env` content for PackTogether | None |
-| `STATUS_BOT_TOKEN` | Telegram bot token for startup notifications | None |
-| `STATUS_CHAT_ID` | Telegram chat ID for startup notifications | None |
+| `STATUS_BOT_TOKEN` | Telegram bot token for status notifications & commands | None |
+| `STATUS_CHAT_ID` | Telegram chat ID for notifications & commands | None |
 
 ## Starting
 
