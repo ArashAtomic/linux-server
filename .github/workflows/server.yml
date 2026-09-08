@@ -5,6 +5,10 @@ on:
     - cron: '45 */5 * * *'
   workflow_dispatch:
 
+concurrency:
+  group: bot-server-singleton
+  cancel-in-progress: true
+
 jobs:
   server:
     runs-on: ubuntu-latest
@@ -93,7 +97,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Trigger Next Workflow Run (if not redeploying)
-        if: always()
+        if: success()
         run: |
           if [ -f /tmp/redeploy.trigger ]; then
             echo "Redeploy already scheduled by trigger. Skipping duplicate dispatch."
