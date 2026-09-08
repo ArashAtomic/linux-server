@@ -86,55 +86,34 @@ nohup cloudflared tunnel --url http://127.0.0.1:8080 --no-autoupdate > /tmp/clou
 CF_PID=$!
 echo "$CF_PID" > /tmp/cloudflared.pid
 
-# Generate SSH key pairs for tmate
-mkdir -p "$HOME/.ssh"
-[ -f "$HOME/.ssh/id_rsa" ] || ssh-keygen -t rsa -b 2048 -f "$HOME/.ssh/id_rsa" -N "" -q
-[ -f "$HOME/.ssh/id_ed25519" ] || ssh-keygen -t ed25519 -f "$HOME/.ssh/id_ed25519" -N "" -q
-
-# Resolve a reachable tmate relay server (default ssh.tmate.io fails DNS on some runners)
+# Ensure SSH server is running (tmate tunnels into local sshd)
 echo
-echo "==> Resolving tmate relay server"
-TMATE_HOST=""
-for CANDIDATE in ssh.tmate.io nyc1.tmate.io fra1.tmate.io lon1.tmate.io tor1.tmate.io sgp1.tmate.io; do
-    if getent hosts "$CANDIDATE" >/dev/null 2>&1; then
-        TMATE_HOST="$CANDIDATE"
-        break
-    fi
-done
+echo "==> Configuring OpenSSH Server"
+sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config 2>/dev/null || true
+sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config 2>/dev/null || true
+sudo systemctl restart ssh || sudo service ssh restart || true
 
-if [ -n "$TMATE_HOST" ]; then
-    echo "Using tmate relay: $TMATE_HOST"
-    printf 'set -g tmate-server-host "%s"\nset -g tmate-server-port 22\nset -g tmate-identity ""\n' "$TMATE_HOST" > "$HOME/.tmate.conf"
-else
-    echo "WARNING: No tmate relay resolved. Falling back to default."
-    TMATE_HOST="ssh.tmate.io"
-    printf 'set -g tmate-server-host "%s"\nset -g tmate-server-port 22\n' "$TMATE_HOST" > "$HOME/.tmate.conf"
-fi
-
-# Start tmate SSH Terminal
+# Start tmate SSH Terminal (uses official public tmate servers, self-hosted fallback)
 echo
 echo "==> Starting tmate SSH Session"
-rm -f /tmp/tmate.sock /tmp/ssh_cmd.txt /tmp/tmate.log
+rm -f /tmp/tmate.sock /tmp/ssh_cmd.txt /tmp/tmate.log /tmp/tmate_stderr.log
+
+# tmate reads server config from ~/.tmate.conf; do NOT pin a broken host -
+# default is tmate.io which auto-negotiates via SSH_FQDN. Try default first.
 nohup tmate -S /tmp/tmate.sock -F > /tmp/tmate.log 2>&1 &
 TM_PID=$!
 echo "$TM_PID" > /tmp/tmate.pid
 
 echo "Waiting for public tunnel endpoints..."
-for i in {1..25}; do
+for i in {1..40}; do
     if [ ! -s /tmp/cloudflared.url ]; then
         if [ -f /tmp/cloudflared.log ]; then
             grep -oiE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' /tmp/cloudflared.log | head -n 1 > /tmp/cloudflared.url || true
         fi
     fi
 
-    if [ ! -s /tmp/ssh_cmd.txt ]; then
-        TM_CMD=""
-        if [ -f /tmp/tmate.log ]; then
-            TM_CMD=$(grep -oiE 'ssh [a-zA-Z0-9]+@[a-zA-Z0-9.-]+\.tmate\.io' /tmp/tmate.log | head -n 1 || true)
-        fi
-        if [ -z "$TM_CMD" ] && [ -S /tmp/tmate.sock ]; then
-            TM_CMD=$(tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}' 2>/dev/null || true)
-        fi
+    if [ ! -s /tmp/ssh_cmd.txt ] && [ -S /tmp/tmate.sock ]; then
+        TM_CMD=$(tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}' 2>/dev/null || true)
         if [[ "$TM_CMD" == ssh* ]]; then
             echo "$TM_CMD" > /tmp/ssh_cmd.txt
         fi
