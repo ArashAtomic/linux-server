@@ -153,9 +153,6 @@ def trigger_github_redeploy(source="User"):
     repo = os.environ.get("GITHUB_REPO", "ArashAtomic/linux-server")
     ref = os.environ.get("GITHUB_REF_NAME", "main")
 
-    with open("/tmp/redeploy.trigger", "w") as f:
-        f.write(f"triggered by {source} at {time.time()}\n")
-
     dispatched = False
     if pat and repo:
         url = f"https://api.github.com/repos/{repo}/actions/workflows/server.yml/dispatches"
@@ -184,8 +181,16 @@ def trigger_github_redeploy(source="User"):
         except Exception as e:
             print(f"gh CLI fallback error: {e}")
 
-    msg = f"🔄 <b>Server Redeploy Triggered ({source})</b>\n\nA fresh GitHub Actions runner instance is starting. The current server will shut down shortly."
-    send_telegram_msg(msg)
+    if dispatched:
+        # Mark trigger file ONLY if dispatch succeeded
+        with open("/tmp/redeploy.trigger", "w") as f:
+            f.write(f"triggered by {source} at {time.time()}\n")
+        msg = f"🔄 <b>Server Redeploy Triggered ({source})</b>\n\nA fresh GitHub Actions runner instance is starting. The current server will shut down shortly."
+        send_telegram_msg(msg)
+    else:
+        msg = f"❌ <b>Redeploy Failed ({source})</b>\n\nCould not trigger new workflow run. Please verify that <code>GH_PAT</code> secret is configured with 'repo' and 'workflow' permissions."
+        send_telegram_msg(msg)
+
     return dispatched
 
 def telegram_poll_worker():
