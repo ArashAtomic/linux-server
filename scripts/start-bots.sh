@@ -91,6 +91,26 @@ mkdir -p "$HOME/.ssh"
 [ -f "$HOME/.ssh/id_rsa" ] || ssh-keygen -t rsa -b 2048 -f "$HOME/.ssh/id_rsa" -N "" -q
 [ -f "$HOME/.ssh/id_ed25519" ] || ssh-keygen -t ed25519 -f "$HOME/.ssh/id_ed25519" -N "" -q
 
+# Resolve a reachable tmate relay server (default ssh.tmate.io fails DNS on some runners)
+echo
+echo "==> Resolving tmate relay server"
+TMATE_HOST=""
+for CANDIDATE in ssh.tmate.io nyc1.tmate.io fra1.tmate.io lon1.tmate.io tor1.tmate.io sgp1.tmate.io; do
+    if getent hosts "$CANDIDATE" >/dev/null 2>&1; then
+        TMATE_HOST="$CANDIDATE"
+        break
+    fi
+done
+
+if [ -n "$TMATE_HOST" ]; then
+    echo "Using tmate relay: $TMATE_HOST"
+    printf 'set -g tmate-server-host "%s"\nset -g tmate-server-port 22\nset -g tmate-identity ""\n' "$TMATE_HOST" > "$HOME/.tmate.conf"
+else
+    echo "WARNING: No tmate relay resolved. Falling back to default."
+    TMATE_HOST="ssh.tmate.io"
+    printf 'set -g tmate-server-host "%s"\nset -g tmate-server-port 22\n' "$TMATE_HOST" > "$HOME/.tmate.conf"
+fi
+
 # Start tmate SSH Terminal
 echo
 echo "==> Starting tmate SSH Session"
