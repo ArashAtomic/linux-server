@@ -95,7 +95,7 @@ if [ -n "${NGROK_AUTHTOKEN:-}" ]; then
     NGROK_PID=$!
     echo "$NGROK_PID" > /tmp/ngrok.pid
 else
-    echo "WARNING: NGROK_AUTHTOKEN is not configured."
+    echo "WARNING: NGROK_AUTHTOKEN secret is not configured in GitHub Secrets!"
 fi
 
 echo "Waiting for public tunnel endpoints..."
@@ -105,17 +105,38 @@ for i in {1..20}; do
             grep -oiE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' /tmp/cloudflared.log | head -n 1 > /tmp/cloudflared.url || true
         fi
     fi
+
     if [ ! -s /tmp/ssh_cmd.txt ]; then
-        TCP_URL=$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | jq -r '.tunnels[0].public_url // empty' 2>/dev/null || true)
-        if [ -z "$TCP_URL" ] && [ -f /tmp/ngrok.log ]; then
+        python3 -c '
+import urllib.request, json, os, sys
+try:
+    with urllib.request.urlopen("http://127.0.0.1:4040/api/tunnels", timeout=2) as res:
+        data = json.loads(res.read().decode())
+        tunnels = data.get("tunnels", [])
+        if tunnels:
+            url = tunnels[0].get("public_url", "")
+            if url.startswith("tcp://"):
+                parts = url.replace("tcp://", "").split(":")
+                user = os.environ.get("SERVER_USERNAME", "admin")
+                cmd = f"ssh {user}@{parts[0]} -p {parts[1]}"
+                with open("/tmp/ssh_cmd.txt", "w") as f:
+                    f.write(cmd)
+                sys.exit(0)
+except Exception:
+    pass
+sys.exit(1)
+' || true
+
+        if [ ! -s /tmp/ssh_cmd.txt ] && [ -f /tmp/ngrok.log ]; then
             TCP_URL=$(grep -oE 'tcp://[a-zA-Z0-9.-]+:[0-9]+' /tmp/ngrok.log | head -n 1 || true)
-        fi
-        if [ -n "$TCP_URL" ]; then
-            HOST=$(echo "$TCP_URL" | sed 's|tcp://||' | cut -d: -f1)
-            PORT=$(echo "$TCP_URL" | sed 's|tcp://||' | cut -d: -f2)
-            echo "ssh ${SERVER_USERNAME:-admin}@$HOST -p $PORT" > /tmp/ssh_cmd.txt
+            if [ -n "$TCP_URL" ]; then
+                HOST=$(echo "$TCP_URL" | sed 's|tcp://||' | cut -d: -f1)
+                PORT=$(echo "$TCP_URL" | sed 's|tcp://||' | cut -d: -f2)
+                echo "ssh ${SERVER_USERNAME:-admin}@$HOST -p $PORT" > /tmp/ssh_cmd.txt
+            fi
         fi
     fi
+
     if [ -s /tmp/cloudflared.url ] && [ -s /tmp/ssh_cmd.txt ]; then
         break
     fi
