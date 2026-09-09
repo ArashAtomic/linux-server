@@ -3,7 +3,7 @@
 set +e
 
 echo "======================================"
-echo "Stopping server processes & Funnel"
+echo "Stopping server processes, Cloudflare Tunnel & Funnel"
 echo "======================================"
 
 stop_process() {
@@ -45,8 +45,9 @@ stop_process() {
 stop_process "Love Whispers" "/tmp/love-whispers.pid"
 stop_process "PackTogether" "/tmp/packtogether.pid"
 stop_process "Management Panel" "/tmp/panel.pid"
+stop_process "Cloudflare Tunnel" "/tmp/cloudflared.pid"
 
-rm -f /tmp/panel_url.txt /tmp/ssh_cmd.txt /tmp/funnel_ssh.log
+rm -f /tmp/panel_url.txt /tmp/cloudflared.url /tmp/ssh_cmd.txt /tmp/cloudflared.log /tmp/funnel_ssh.log
 
 echo
 echo "All processes stopped."

@@ -93,6 +93,7 @@ jobs:
             /tmp/love-whispers.log
             /tmp/packtogether.log
             /tmp/panel.log
+            /tmp/cloudflared.log
             /tmp/funnel_ssh.log
           if-no-files-found: warn
 

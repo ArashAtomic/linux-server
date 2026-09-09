@@ -11,7 +11,7 @@ LOVE_WHISPERS_DIR="$BOT_DIR/love-whispers-bot"
 PACKTOGETHER_DIR="$BOT_DIR/PackTogether"
 
 echo "======================================"
-echo "Starting bots, Panel, and Tailscale Funnel"
+echo "Starting bots, Panel, Cloudflare Tunnel, and Tailscale Funnel"
 echo "======================================"
 
 # Read persistent bot enabled flags
@@ -95,10 +95,35 @@ deactivate
 
 echo "Management Panel PID: $PANEL_PID (Port 8080)"
 
-# Connect Tailscale and Configure Tailscale Funnel
+# Start Cloudflare Tunnel for Web Panel
+echo
+echo "==> Starting Cloudflare Tunnel for Web Panel"
+rm -f /tmp/cloudflared.url /tmp/panel_url.txt /tmp/ssh_cmd.txt
+nohup cloudflared tunnel --url http://localhost:8080 > /tmp/cloudflared.log 2>&1 &
+CF_PID=$!
+echo "$CF_PID" > /tmp/cloudflared.pid
+
+echo "Waiting for Cloudflare Panel URL..."
+for i in {1..15}; do
+    if [ ! -s /tmp/cloudflared.url ]; then
+        grep -o 'https://[-a-zA-Z0-9.]*\.trycloudflare\.com' /tmp/cloudflared.log | head -n 1 > /tmp/cloudflared.url || true
+    fi
+    if [ -s /tmp/cloudflared.url ]; then
+        break
+    fi
+    sleep 1
+done
+
+if [ -s /tmp/cloudflared.url ]; then
+    cp /tmp/cloudflared.url /tmp/panel_url.txt
+else
+    echo "WARNING: Cloudflare Tunnel URL was not discovered."
+    echo "http://localhost:8080" > /tmp/panel_url.txt
+fi
+
+# Connect Tailscale and configure Tailscale Funnel for SSH
 echo
 echo "==> Connecting Tailscale"
-rm -f /tmp/ssh_cmd.txt /tmp/panel_url.txt
 
 if [ -n "${TAILSCALE_AUTHKEY:-}" ]; then
     sudo tailscale up --authkey="$TAILSCALE_AUTHKEY" --hostname="bot-server" --accept-routes || true
@@ -172,19 +197,7 @@ EOF
     sudo systemctl enable tailscale-funnel.service 2>/dev/null || true
 fi
 
-# Configure Web Panel access (Funnel on secondary port)
-PANEL_PORT="8443"
-if [ "$FUNNEL_PORT" = "8443" ]; then
-    PANEL_PORT="10000"
-elif [ "$FUNNEL_PORT" = "10000" ]; then
-    PANEL_PORT="8443"
-fi
-
-sudo tailscale funnel --bg "$PANEL_PORT" http://localhost:8080 2>/dev/null || \
-sudo tailscale serve --bg "$PANEL_PORT" http://localhost:8080 2>/dev/null || true
-sudo tailscale funnel "$PANEL_PORT" on 2>/dev/null || true
-
-# Check Funnel Status
+# Check Tailscale Funnel status
 echo
 echo "==> Tailscale Funnel Status:"
 tailscale funnel status 2>/dev/null || tailscale serve status 2>/dev/null || true
@@ -193,20 +206,17 @@ tailscale funnel status 2>/dev/null || tailscale serve status 2>/dev/null || tru
 if [ -n "$TS_DOMAIN" ] && [ -n "$FUNNEL_PORT" ]; then
     SSH_CMD="ssh -p $FUNNEL_PORT $SSH_USER@$TS_DOMAIN"
     echo "$SSH_CMD" > /tmp/ssh_cmd.txt
-    echo "https://$TS_DOMAIN:$PANEL_PORT" > /tmp/panel_url.txt
 elif [ -n "$TS_DOMAIN" ]; then
     TS_IP=$(tailscale ip -4 2>/dev/null || echo "127.0.0.1")
     SSH_CMD="ssh $SSH_USER@$TS_IP"
     echo "$SSH_CMD" > /tmp/ssh_cmd.txt
-    echo "http://$TS_IP:8080" > /tmp/panel_url.txt
 else
     echo "ssh $SSH_USER@localhost" > /tmp/ssh_cmd.txt
-    echo "http://localhost:8080" > /tmp/panel_url.txt
 fi
 
 echo
 echo "======================================"
-echo "Processes and Funnel Active"
+echo "Processes, Cloudflare Tunnel, and SSH Funnel Active"
 echo "======================================"
 
 echo "Web Panel URL : $(cat /tmp/panel_url.txt)"

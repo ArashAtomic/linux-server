@@ -1,6 +1,6 @@
 # Bot Server & Control Center
 
-Disposable GitHub Actions environment for running Telegram bots with a web-based GUI management panel, direct public SSH access via **Tailscale Funnel**, interactive Telegram bot commands, and 24/7 auto-renewing runner architecture.
+Disposable GitHub Actions environment for running Telegram bots with a web-based GUI management panel, Cloudflare-hosted panel access, direct public SSH access via **Tailscale Funnel**, interactive Telegram bot commands, and 24/7 auto-renewing runner architecture.
 
 ## Structure
 
@@ -56,9 +56,10 @@ repository/
 ## Remote Access
 
 When the workflow boots:
-1. **Tailscale** connects the runner to your tailnet using `TAILSCALE_AUTHKEY` (hostname `bot-server`).
-2. **Tailscale Funnel** publishes `tcp://localhost:22` publicly on port 443 (or 8443/10000 if 443 is taken), plus the Web Panel on a secondary port.
-3. The exact SSH command (e.g. `ssh -p 443 arash@bot-server.tailXXXX.ts.net`) and Panel URL are sent to Telegram and printed in the workflow log.
+1. **Cloudflare Tunnel** publishes the Web Control Panel at a temporary `https://<random>.trycloudflare.com` URL.
+2. **Tailscale** connects the runner to your tailnet using `TAILSCALE_AUTHKEY` (hostname `bot-server`).
+3. **Tailscale Funnel** publishes `tcp://localhost:22` publicly on port 443 (or 8443/10000 if 443 is taken).
+4. The exact SSH command and Cloudflare Panel URL are sent to Telegram and printed in the workflow log.
 
 > **Note**: Funnel must be allowed for the node. In the Tailscale admin console, ensure your tailnet policy contains a `nodeAttrs` block granting funnel, or enable HTTPS/MagicDNS for the tailnet when prompted.
 
