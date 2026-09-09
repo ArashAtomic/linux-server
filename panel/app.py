@@ -284,12 +284,11 @@ def login():
     error = None
     expected_user, expected_pass = get_auth_credentials()
     if request.method == "POST":
-        user = request.form.get("username", "")
         pwd = request.form.get("password", "")
-        if user == expected_user and pwd == expected_pass:
+        if pwd == expected_pass:
             session["logged_in"] = True
             return redirect(url_for("index"))
-        error = "Invalid username or password."
+        error = "Invalid password."
     return render_template("login.html", error=error)
 
 @app.route("/logout")
