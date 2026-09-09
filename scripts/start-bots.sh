@@ -146,26 +146,20 @@ FUNNEL_PORT=""
 setup_ssh_funnel() {
     local target_port="$1"
     echo "Trying Tailscale Funnel on port $target_port -> localhost:22..."
-    
-    # Try background funnel command
-    if sudo tailscale funnel --bg "$target_port" tcp://localhost:22 2>/dev/null; then
-        return 0
+
+    if ! sudo tailscale funnel --yes --bg --tcp="$target_port" tcp://127.0.0.1:22 \
+        >> /tmp/funnel_ssh.log 2>&1; then
+        return 1
     fi
 
-    # Try serve tcp + funnel on
-    if sudo tailscale serve --bg --tcp "$target_port" tcp://localhost:22 2>/dev/null || \
-       sudo tailscale serve --bg "$target_port" tcp://localhost:22 2>/dev/null; then
-        sudo tailscale funnel "$target_port" on 2>/dev/null || true
-        return 0
+    sudo tailscale funnel status --json > /tmp/funnel_status.json 2>> /tmp/funnel_ssh.log || return 1
+    if ! grep -q "\"$target_port\"\|:$target_port\|$target_port" /tmp/funnel_status.json || \
+       ! grep -q "127.0.0.1:22\|localhost:22" /tmp/funnel_status.json; then
+        echo "Funnel status does not show TCP port $target_port forwarding to SSH." >> /tmp/funnel_ssh.log
+        return 1
     fi
 
-    # Try foreground funnel in background
-    if nohup sudo tailscale funnel "$target_port" tcp://localhost:22 > /tmp/funnel_ssh.log 2>&1 & then
-        sleep 2
-        return 0
-    fi
-
-    return 1
+    return 0
 }
 
 for PORT in 443 8443 10000; do
@@ -187,8 +181,8 @@ Wants=tailscaled.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/tailscale funnel --bg ${FUNNEL_PORT} tcp://localhost:22
-ExecStop=/usr/bin/tailscale funnel ${FUNNEL_PORT} off
+ExecStart=/usr/bin/tailscale funnel --yes --bg --tcp=${FUNNEL_PORT} tcp://127.0.0.1:22
+ExecStop=/usr/bin/tailscale funnel --tcp=${FUNNEL_PORT} tcp://127.0.0.1:22 off
 
 [Install]
 WantedBy=multi-user.target
