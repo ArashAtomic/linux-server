@@ -135,7 +135,8 @@ fi
 
 NINEROUTER_READY=false
 for i in {1..30}; do
-    if curl -fsS --max-time 2 http://127.0.0.1:20128/v1/models >/dev/null 2>&1; then
+    HTTP_STATUS=$(curl -sS --max-time 2 -o /dev/null -w '%{http_code}' http://127.0.0.1:20128/dashboard 2>/dev/null || true)
+    if [[ "$HTTP_STATUS" =~ ^[234][0-9][0-9]$ ]]; then
         NINEROUTER_READY=true
         break
     fi
@@ -149,6 +150,8 @@ if [ "$NINEROUTER_READY" != "true" ]; then
     exit 1
 fi
 echo "9Router ready at http://127.0.0.1:20128 (dashboard /dashboard, API /v1)"
+MODEL_STATUS=$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' http://127.0.0.1:20128/v1/models 2>/dev/null || true)
+echo "9Router model endpoint HTTP status: ${MODEL_STATUS:-unavailable}"
 
 # Setup OpenSSH Server
 echo
