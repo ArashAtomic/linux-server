@@ -19,13 +19,13 @@ mkdir -p "$PANEL_DIR"
 
 # The hosted runner may include Google's Chrome source, which can briefly serve
 # Packages metadata that does not match its Release file. Chrome is not a
-# dependency of this server, so disable that optional source during setup.
-for chrome_source in /etc/apt/sources.list.d/google-chrome*.list; do
-    if [ -f "$chrome_source" ]; then
-        echo "==> Disabling unused Chrome APT source: $chrome_source"
-        sudo mv "$chrome_source" "${chrome_source}.disabled"
+# dependency of this server, so disable every APT definition that references it.
+while IFS= read -r -d '' apt_source; do
+    if grep -Eqi 'dl\.google\.com/linux/chrome|google-chrome' "$apt_source"; then
+        echo "==> Disabling unused Chrome APT source: $apt_source"
+        sudo mv "$apt_source" "${apt_source}.disabled"
     fi
-done
+done < <(find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) -print0 2>/dev/null)
 
 echo
 echo "==> Updating system"
