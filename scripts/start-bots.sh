@@ -144,6 +144,8 @@ done
 if [ "$NINEROUTER_READY" != "true" ]; then
     echo "ERROR: 9Router did not become ready within 30 seconds."
     "${DOCKER[@]}" logs --tail 40 9router >> /tmp/9router.log 2>&1 || true
+    echo "9Router diagnostics:"
+    tail -n 60 /tmp/9router.log || true
     exit 1
 fi
 echo "9Router ready at http://127.0.0.1:20128 (dashboard /dashboard, API /v1)"

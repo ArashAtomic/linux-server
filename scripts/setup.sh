@@ -102,10 +102,14 @@ PORT=20128
 NODE_ENV=production
 BASE_URL=http://127.0.0.1:20128
 NEXT_PUBLIC_BASE_URL=http://127.0.0.1:20128
-REQUIRE_API_KEY=true
+# The API is bound to loopback by start-bots.sh; Hermes uses it locally.
+REQUIRE_API_KEY=false
 ENABLE_REQUEST_LOGS=false
 EOF
     chmod 600 "$NINEROUTER_HOME_DIR/.env"
+fi
+if grep -q '^REQUIRE_API_KEY=true$' "$NINEROUTER_HOME_DIR/.env"; then
+    sed -i 's/^REQUIRE_API_KEY=true$/REQUIRE_API_KEY=false/' "$NINEROUTER_HOME_DIR/.env"
 fi
 
 echo
