@@ -44,6 +44,7 @@ stop_process() {
 
 stop_process "Love Whispers" "/tmp/love-whispers.pid"
 stop_process "PackTogether" "/tmp/packtogether.pid"
+stop_process "Hermes Agent" "/tmp/hermes.pid"
 stop_process "Management Panel" "/tmp/panel.pid"
 stop_process "Cloudflare Tunnel" "/tmp/cloudflared.pid"
 

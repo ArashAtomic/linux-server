@@ -5,6 +5,7 @@ set -euo pipefail
 BASE_DIR="$HOME/bot-server"
 BOT_DIR="$BASE_DIR/bots"
 PANEL_DIR="$BASE_DIR/panel"
+HERMES_HOME_DIR="$HOME/.hermes"
 
 LOVE_WHISPERS_DIR="$BOT_DIR/love-whispers-bot"
 PACKTOGETHER_DIR="$BOT_DIR/PackTogether"
@@ -49,6 +50,23 @@ echo
 echo "==> Installing Tailscale"
 curl -fsSL https://tailscale.com/install.sh | sh
 tailscale version || true
+
+echo
+echo "==> Installing Hermes Agent"
+curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
+export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$PATH"
+if ! command -v hermes >/dev/null 2>&1; then
+    echo "ERROR: Hermes Agent installation did not provide the hermes command."
+    exit 1
+fi
+hermes --version
+mkdir -p "$HERMES_HOME_DIR"
+chmod 700 "$HERMES_HOME_DIR"
+
+if [ -n "${HERMES_ENV:-}" ]; then
+    printf '%s\n' "$HERMES_ENV" > "$HERMES_HOME_DIR/.env"
+    chmod 600 "$HERMES_HOME_DIR/.env"
+fi
 
 echo
 echo "==> Installing Python 3.12"
@@ -171,3 +189,4 @@ echo
 echo "Love Whispers: $LOVE_WHISPERS_DIR"
 echo "PackTogether:  $PACKTOGETHER_DIR"
 echo "Panel:         $PANEL_DIR"
+echo "Hermes home:   $HERMES_HOME_DIR"

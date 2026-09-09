@@ -25,7 +25,17 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /home/runner/bot-server/state.json
-          key: bot-server-state-persistent
+          key: bot-server-state-${{ github.run_id }}
+          restore-keys: |
+            bot-server-state-
+
+      - name: Restore Hermes State
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/.hermes
+          key: hermes-state-${{ github.run_id }}
+          restore-keys: |
+            hermes-state-
 
       - name: Setup Environment
         env:
@@ -34,6 +44,7 @@ jobs:
           CLONE_PAT: ${{ secrets.CLONE_PAT || secrets.GH_PAT }}
           LOVE_WHISPERS_ENV: ${{ secrets.LOVE_WHISPERS_ENV }}
           PACKTOGETHER_ENV: ${{ secrets.PACKTOGETHER_ENV }}
+          HERMES_ENV: ${{ secrets.HERMES_ENV }}
         run: ./scripts/setup.sh
 
       - name: Start Telegram Bots, Panel & Tunnels
@@ -44,6 +55,7 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
           STATUS_BOT_TOKEN: ${{ secrets.STATUS_BOT_TOKEN }}
           STATUS_CHAT_ID: ${{ secrets.STATUS_CHAT_ID }}
+          HERMES_API_SERVER_KEY: ${{ secrets.HERMES_API_SERVER_KEY }}
           GITHUB_REPO: ${{ github.repository }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
         run: ./scripts/start-bots.sh
@@ -77,12 +89,24 @@ jobs:
         if: always()
         run: ./scripts/stop-bots.sh
 
+      - name: Prepare Hermes State Cache
+        if: always()
+        run: |
+          rm -f /home/runner/.hermes/.env /home/runner/.hermes/auth.json
+
       - name: Save Persistent Bot State
         if: always()
         uses: actions/cache/save@v4
         with:
           path: /home/runner/bot-server/state.json
-          key: bot-server-state-persistent-${{ github.run_id }}
+          key: bot-server-state-${{ github.run_id }}
+
+      - name: Save Hermes State
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: /home/runner/.hermes
+          key: hermes-state-${{ github.run_id }}
 
       - name: Upload Logs
         if: always()
@@ -95,6 +119,7 @@ jobs:
             /tmp/panel.log
             /tmp/cloudflared.log
             /tmp/funnel_ssh.log
+            /tmp/hermes.log
           if-no-files-found: warn
 
       - name: Trigger Next Workflow Run (if not redeploying)

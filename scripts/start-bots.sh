@@ -6,6 +6,7 @@ BASE_DIR="$HOME/bot-server"
 BOT_DIR="$BASE_DIR/bots"
 PANEL_DIR="$BASE_DIR/panel"
 STATE_FILE="$BASE_DIR/state.json"
+HERMES_HOME_DIR="$HOME/.hermes"
 
 LOVE_WHISPERS_DIR="$BOT_DIR/love-whispers-bot"
 PACKTOGETHER_DIR="$BOT_DIR/PackTogether"
@@ -56,6 +57,53 @@ else
     echo "==> PackTogether is DISABLED in saved state (Skipping startup)"
     rm -f /tmp/packtogether.pid
 fi
+
+# Hermes Agent API and gateway
+echo
+echo "==> Starting Hermes Agent"
+export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$PATH"
+export HERMES_HOME="$HERMES_HOME_DIR"
+export API_SERVER_ENABLED="true"
+export API_SERVER_HOST="127.0.0.1"
+export API_SERVER_PORT="8642"
+export API_SERVER_KEY="${HERMES_API_SERVER_KEY:-}"
+export HERMES_API_SERVER_KEY="$API_SERVER_KEY"
+
+if [ -z "$API_SERVER_KEY" ]; then
+    echo "ERROR: HERMES_API_SERVER_KEY is not configured."
+    exit 1
+fi
+if ! command -v hermes >/dev/null 2>&1; then
+    echo "ERROR: Hermes Agent is not installed."
+    exit 1
+fi
+
+nohup env HERMES_HOME="$HERMES_HOME" API_SERVER_ENABLED="$API_SERVER_ENABLED" \
+    API_SERVER_HOST="$API_SERVER_HOST" API_SERVER_PORT="$API_SERVER_PORT" \
+    API_SERVER_KEY="$API_SERVER_KEY" hermes gateway > /tmp/hermes.log 2>&1 &
+HERMES_PID=$!
+echo "$HERMES_PID" > /tmp/hermes.pid
+
+echo "Waiting for Hermes API..."
+HERMES_READY=false
+for i in {1..30}; do
+    if curl -fsS --max-time 2 http://127.0.0.1:8642/health >/dev/null 2>&1; then
+        HERMES_READY=true
+        break
+    fi
+    if ! kill -0 "$HERMES_PID" 2>/dev/null; then
+        echo "ERROR: Hermes exited during startup."
+        tail -n 40 /tmp/hermes.log || true
+        exit 1
+    fi
+    sleep 1
+done
+if [ "$HERMES_READY" != "true" ]; then
+    echo "ERROR: Hermes API did not become ready within 30 seconds."
+    tail -n 40 /tmp/hermes.log || true
+    exit 1
+fi
+echo "Hermes Agent PID: $HERMES_PID (API 127.0.0.1:8642)"
 
 # Setup OpenSSH Server
 echo

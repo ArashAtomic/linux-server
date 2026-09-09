@@ -7,9 +7,11 @@ import subprocess
 import json
 import urllib.request
 import urllib.parse
+from threading import Lock
 from functools import wraps
-from flask import Flask, jsonify, render_template, request, session, redirect, url_for
+from flask import Flask, Response, jsonify, render_template, request, session, redirect, stream_with_context, url_for
 import psutil
+import requests
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
@@ -17,6 +19,11 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
 BASE_DIR = os.path.expanduser("~/bot-server")
 STATE_FILE = os.path.join(BASE_DIR, "state.json")
 START_TIME = time.time()
+HERMES_API_URL = os.environ.get("HERMES_API_URL", "http://127.0.0.1:8642")
+HERMES_API_KEY = os.environ.get("HERMES_API_SERVER_KEY", "")
+HERMES_MODEL = os.environ.get("HERMES_MODEL", "hermes-agent")
+ACTIVE_HERMES_REQUESTS = {}
+ACTIVE_HERMES_REQUESTS_LOCK = Lock()
 
 BOTS = {
     "love-whispers": {
@@ -71,6 +78,12 @@ def get_auth_credentials():
     user = os.environ.get("SERVER_USERNAME", "admin")
     pwd = os.environ.get("SERVER_PASSWORD", "admin")
     return user, pwd
+
+def hermes_headers():
+    return {
+        "Authorization": f"Bearer {HERMES_API_KEY}",
+        "Accept": "application/json"
+    }
 
 def login_required(f):
     @wraps(f)
@@ -350,6 +363,104 @@ def status():
         },
         "bots": bot_status
     })
+
+@app.route("/api/assistant/health")
+@login_required
+def assistant_health():
+    if not HERMES_API_KEY:
+        return jsonify({"available": False, "error": "Hermes API key is not configured"}), 503
+    try:
+        response = requests.get(
+            f"{HERMES_API_URL}/health",
+            headers=hermes_headers(),
+            timeout=3
+        )
+        if not response.ok:
+            return jsonify({"available": False, "error": "Hermes health check failed"}), 503
+        return jsonify({"available": True, "model": HERMES_MODEL})
+    except requests.RequestException:
+        return jsonify({"available": False, "error": "Hermes is unavailable"}), 503
+
+@app.route("/api/assistant/chat", methods=["POST"])
+@login_required
+def assistant_chat():
+    if not HERMES_API_KEY:
+        return jsonify({"error": "Hermes API key is not configured"}), 503
+
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or not isinstance(payload.get("messages"), list):
+        return jsonify({"error": "messages must be a JSON array"}), 400
+    if len(payload["messages"]) > 100:
+        return jsonify({"error": "Too many messages"}), 413
+
+    messages = []
+    for message in payload["messages"]:
+        if not isinstance(message, dict):
+            return jsonify({"error": "Invalid message"}), 400
+        role = message.get("role")
+        content = message.get("content")
+        if role not in ["user", "assistant"] or not isinstance(content, str):
+            return jsonify({"error": "Invalid message shape"}), 400
+        if len(content) > 20000:
+            return jsonify({"error": "Message is too large"}), 413
+        messages.append({"role": role, "content": content})
+
+    upstream_payload = {
+        "model": HERMES_MODEL,
+        "messages": messages,
+        "stream": True
+    }
+    request_id = request.headers.get("X-Assistant-Request-Id", "")
+    if not request_id or len(request_id) > 128:
+        return jsonify({"error": "Missing assistant request id"}), 400
+
+    try:
+        upstream = requests.post(
+            f"{HERMES_API_URL}/v1/chat/completions",
+            headers={**hermes_headers(), "Content-Type": "application/json"},
+            json=upstream_payload,
+            stream=True,
+            timeout=(5, 1800)
+        )
+    except requests.RequestException:
+        return jsonify({"error": "Hermes request failed"}), 502
+
+    if not upstream.ok:
+        upstream.close()
+        return jsonify({"error": "Hermes rejected the request"}), 502
+
+    with ACTIVE_HERMES_REQUESTS_LOCK:
+        ACTIVE_HERMES_REQUESTS[request_id] = upstream
+
+    @stream_with_context
+    def relay_events():
+        try:
+            for line in upstream.iter_lines(decode_unicode=True):
+                if line:
+                    yield f"{line}\n\n"
+        finally:
+            upstream.close()
+            with ACTIVE_HERMES_REQUESTS_LOCK:
+                ACTIVE_HERMES_REQUESTS.pop(request_id, None)
+
+    return Response(relay_events(), content_type="text/event-stream", headers={
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no"
+    })
+
+@app.route("/api/assistant/stop", methods=["POST"])
+@login_required
+def assistant_stop():
+    payload = request.get_json(silent=True) or {}
+    request_id = payload.get("request_id", "")
+    if not isinstance(request_id, str) or not request_id or len(request_id) > 128:
+        return jsonify({"error": "Invalid assistant request id"}), 400
+    with ACTIVE_HERMES_REQUESTS_LOCK:
+        upstream = ACTIVE_HERMES_REQUESTS.get(request_id)
+    if upstream:
+        upstream.close()
+        return jsonify({"stopped": True})
+    return jsonify({"stopped": False})
 
 @app.route("/api/server/redeploy", methods=["POST"])
 @login_required

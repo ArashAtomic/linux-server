@@ -189,6 +189,18 @@
         .toast { padding: 10px 14px; border-radius: 8px; background: #0d141f; border: 1px solid var(--border-light); color: var(--text); font-size: 12px; box-shadow: var(--shadow); }
         .toast.success { border-color: rgba(52,211,153,.4); }
         .toast.error { border-color: rgba(251,113,133,.4); }
+
+        .assistant-chat { display: flex; flex-direction: column; gap: 12px; }
+        .assistant-messages { height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px; background: #04070d; border: 1px solid var(--border); border-radius: 8px; }
+        .assistant-message { max-width: 88%; padding: 10px 12px; border-radius: 8px; white-space: pre-wrap; line-height: 1.5; font-size: 12px; }
+        .assistant-message.user { align-self: flex-end; background: var(--accent-soft); border: 1px solid rgba(56,189,248,.25); }
+        .assistant-message.assistant { align-self: flex-start; background: rgba(255,255,255,.035); border: 1px solid var(--border); }
+        .assistant-activity { min-height: 18px; color: var(--text-muted); font-family: var(--mono); font-size: 11px; }
+        .assistant-composer { position: relative; display: flex; gap: 8px; }
+        .assistant-input { flex: 1; min-height: 42px; resize: vertical; padding: 10px 12px; color: var(--text); background: #0a1019; border: 1px solid var(--border-light); border-radius: 7px; font-size: 12px; }
+        .assistant-suggestions { position: absolute; left: 0; right: 76px; bottom: calc(100% + 6px); display: none; max-height: 180px; overflow-y: auto; background: var(--panel-strong); border: 1px solid var(--border-light); border-radius: 7px; box-shadow: var(--shadow); z-index: 5; }
+        .assistant-suggestion { padding: 8px 10px; color: var(--text-secondary); font-family: var(--mono); font-size: 11px; cursor: pointer; }
+        .assistant-suggestion:hover { color: var(--text); background: rgba(255,255,255,.06); }
     </style>
 </head>
 <body>
@@ -333,6 +345,7 @@
             <div class="console-header">
                 <div class="console-left">
                     <div class="console-tabs">
+                        <button class="tab-btn" onclick="switchTab('assistant', this)">Server Assistant</button>
                         <button class="tab-btn active" onclick="switchTab('logs', this)">Logs</button>
                         <button class="tab-btn" onclick="switchTab('env', this)">Environment</button>
                         <button class="tab-btn" onclick="switchTab('files', this)">File Explorer</button>
@@ -387,6 +400,24 @@
                     <div id="file-preview-box" class="logs-box" style="display:none; margin-top: 15px;"></div>
                 </div>
             </div>
+
+            <div id="tab-assistant" style="display:none">
+                <div class="console-toolbar">
+                    <div class="live-indicator"><span></span>HERMES</div>
+                    <div id="assistant-status" class="log-meta">Checking assistant...</div>
+                    <button class="btn" onclick="newAssistantChat()">＋ New Chat</button>
+                    <button class="btn btn-stop" id="assistant-stop" onclick="stopAssistant()" disabled>⏹ Stop</button>
+                </div>
+                <div class="console-body assistant-chat">
+                    <div id="assistant-messages" class="assistant-messages"></div>
+                    <div id="assistant-activity" class="assistant-activity"></div>
+                    <div class="assistant-composer">
+                        <div id="assistant-suggestions" class="assistant-suggestions"></div>
+                        <textarea id="assistant-input" class="assistant-input" rows="2" placeholder="Ask Hermes to inspect or manage the server..."></textarea>
+                        <button class="btn btn-start" onclick="sendAssistantMessage()">Send</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </section>
 </div>
@@ -401,6 +432,10 @@
     let paused = false;
     let sshCmd = '';
     let currentPath = '';
+    let assistantMessages = [];
+    let assistantAbort = null;
+    let assistantRequestId = '';
+    const assistantCommands = ['/help', '/new', '/reset', '/status', '/stop', '/model', '/tools', '/skills', '/sessions', '/resume', '/bg', '/approve', '/deny', '/compress', '/sethome'];
 
     function showToast(msg, type = 'success') {
         const container = document.getElementById('toast-container');
@@ -559,8 +594,9 @@
         document.getElementById('tab-logs').style.display = tab === 'logs' ? 'block' : 'none';
         document.getElementById('tab-env').style.display = tab === 'env' ? 'block' : 'none';
         document.getElementById('tab-files').style.display = tab === 'files' ? 'block' : 'none';
+        document.getElementById('tab-assistant').style.display = tab === 'assistant' ? 'block' : 'none';
 
-        document.getElementById('bot-select-wrapper').style.display = tab === 'files' ? 'none' : 'block';
+        document.getElementById('bot-select-wrapper').style.display = tab === 'files' || tab === 'assistant' ? 'none' : 'block';
 
         loadActiveTabData();
     }
@@ -569,7 +605,127 @@
         if (currentTab === 'logs') fetchLogs();
         if (currentTab === 'env') fetchEnv();
         if (currentTab === 'files') fetchFiles(currentPath);
+        if (currentTab === 'assistant') checkAssistant();
     }
+
+    function renderAssistantMessages() {
+        const box = document.getElementById('assistant-messages');
+        box.innerHTML = '';
+        assistantMessages.forEach(message => {
+            const item = document.createElement('div');
+            item.className = `assistant-message ${message.role}`;
+            item.innerText = message.content;
+            box.appendChild(item);
+        });
+        box.scrollTop = box.scrollHeight;
+    }
+
+    async function checkAssistant() {
+        try {
+            const res = await fetch('/api/assistant/health');
+            const data = await res.json();
+            document.getElementById('assistant-status').innerText = data.available ? `READY · ${data.model}` : (data.error || 'UNAVAILABLE');
+        } catch (e) {
+            document.getElementById('assistant-status').innerText = 'UNAVAILABLE';
+        }
+    }
+
+    function newAssistantChat() {
+        assistantMessages = [];
+        document.getElementById('assistant-activity').innerText = '';
+        renderAssistantMessages();
+    }
+
+    async function stopAssistant() {
+        if (assistantRequestId) {
+            fetch('/api/assistant/stop', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ request_id: assistantRequestId })
+            }).catch(() => {});
+        }
+        if (assistantAbort) assistantAbort.abort();
+        assistantAbort = null;
+        document.getElementById('assistant-stop').disabled = true;
+        document.getElementById('assistant-activity').innerText = 'Stopped';
+    }
+
+    async function sendAssistantMessage() {
+        const input = document.getElementById('assistant-input');
+        const content = input.value.trim();
+        if (!content || assistantAbort) return;
+        input.value = '';
+        assistantMessages.push({ role: 'user', content });
+        const assistantMessage = { role: 'assistant', content: '' };
+        assistantMessages.push(assistantMessage);
+        renderAssistantMessages();
+        document.getElementById('assistant-stop').disabled = false;
+        document.getElementById('assistant-activity').innerText = 'Working...';
+        assistantAbort = new AbortController();
+        assistantRequestId = crypto.randomUUID();
+        try {
+            const res = await fetch('/api/assistant/chat', {
+                method: 'POST',
+                body: JSON.stringify({ messages: assistantMessages.slice(0, -1) }),
+                headers: { 'Content-Type': 'application/json', 'X-Assistant-Request-Id': assistantRequestId },
+                signal: assistantAbort.signal
+            });
+            if (!res.ok) throw new Error((await res.json()).error || 'Assistant request failed');
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const events = buffer.split('\n\n');
+                buffer = events.pop();
+                for (const event of events) {
+                    const line = event.split('\n').find(entry => entry.startsWith('data: '));
+                    if (!line || line === 'data: [DONE]') continue;
+                    try {
+                        const data = JSON.parse(line.slice(6));
+                        const delta = data.choices?.[0]?.delta?.content || '';
+                        assistantMessage.content += delta;
+                        renderAssistantMessages();
+                    } catch (e) { /* Ignore non-JSON stream metadata. */ }
+                }
+            }
+            document.getElementById('assistant-activity').innerText = '';
+        } catch (e) {
+            if (e.name !== 'AbortError') {
+                assistantMessage.content = `Assistant error: ${e.message}`;
+                renderAssistantMessages();
+            }
+        } finally {
+            assistantAbort = null;
+            assistantRequestId = '';
+            document.getElementById('assistant-stop').disabled = true;
+        }
+    }
+
+    function updateAssistantSuggestions() {
+        const input = document.getElementById('assistant-input');
+        const box = document.getElementById('assistant-suggestions');
+        const value = input.value;
+        if (!value.startsWith('/')) { box.style.display = 'none'; return; }
+        const matches = assistantCommands.filter(command => command.startsWith(value.split(' ')[0]));
+        box.innerHTML = '';
+        matches.forEach(command => {
+            const item = document.createElement('div');
+            item.className = 'assistant-suggestion';
+            item.innerText = command;
+            item.onclick = () => { input.value = `${command} `; input.focus(); box.style.display = 'none'; };
+            box.appendChild(item);
+        });
+        box.style.display = matches.length ? 'block' : 'none';
+    }
+
+    document.getElementById('assistant-input').addEventListener('input', updateAssistantSuggestions);
+    document.getElementById('assistant-input').addEventListener('keydown', event => {
+        if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendAssistantMessage(); }
+        if (event.key === 'Escape') document.getElementById('assistant-suggestions').style.display = 'none';
+    });
 
     async function controlBot(bot, action) {
         try {
