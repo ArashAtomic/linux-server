@@ -3,7 +3,7 @@
 set +e
 
 echo "======================================"
-echo "Stopping server processes, Cloudflare Tunnel & Funnel"
+echo "Stopping server processes and Cloudflare Tunnel"
 echo "======================================"
 
 stop_process() {
@@ -52,7 +52,7 @@ if command -v docker >/dev/null 2>&1; then
     docker stop 9router >/dev/null 2>&1 || sudo -n docker stop 9router >/dev/null 2>&1 || true
 fi
 
-rm -f /tmp/panel_url.txt /tmp/cloudflared.url /tmp/ssh_cmd.txt /tmp/cloudflared.log /tmp/funnel_ssh.log
+rm -f /tmp/panel_url.txt /tmp/cloudflared.url /tmp/ssh_cmd.txt /tmp/cloudflared.log
 
 echo
 echo "All processes stopped."

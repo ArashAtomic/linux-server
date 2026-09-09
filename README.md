@@ -1,6 +1,6 @@
 # Bot Server & Control Center
 
-Disposable GitHub Actions environment for running Telegram bots with a web-based GUI management panel, Cloudflare-hosted panel access, direct public SSH access via **Tailscale Funnel**, interactive Telegram bot commands, and 24/7 auto-renewing runner architecture.
+Disposable GitHub Actions environment for running Telegram bots with a web-based GUI management panel, Cloudflare-hosted panel access, private SSH access through **Tailscale**, interactive Telegram bot commands, and 24/7 auto-renewing runner architecture.
 
 ## Structure
 
@@ -44,21 +44,19 @@ repository/
   - OpenAI-compatible API: `http://127.0.0.1:20128/v1`.
   - Persistent database and configuration are stored in `~/.9router` and restored through the `9router-state-*` Actions cache.
   - Select **9Router (local)** in Server Assistant → Providers, enter the 9Router API key from its dashboard, fetch models, choose one, and save.
-- **Public SSH Access (Tailscale Funnel)**:
-  - Exposes the VM's OpenSSH server (port 22) to the public internet via Tailscale Funnel.
-  - Port priority: **443** → fallback **8443** → fallback **10000**.
-  - Works from any machine with a standard SSH client — **no Tailscale install needed on the client**:
+- **Private SSH Access (Tailscale)**:
+  - Exposes the VM's OpenSSH server on port 22 only through its Tailscale address.
+  - Requires Tailscale to be installed and logged into the same tailnet on the client:
     ```bash
-    ssh -p 443 <SERVER_USERNAME>@<machine>.<tailnet>.ts.net
+    ssh <SERVER_USERNAME>@<machine>.<tailnet>.ts.net
     ```
   - Prompts for your `SERVER_PASSWORD` in the terminal before granting shell access.
-  - Funnel config persisted via a `tailscale-funnel.service` systemd unit.
 - **Interactive Telegram Bot Commands**:
   - On boot, sends the Web Panel URL and the exact SSH command to your Telegram status chat.
   - `🔄 /redeploy` or `/restart` - Trigger a fresh GitHub Actions workflow run and update the server instantly.
   - `📊 /status` - Real-time CPU/RAM stats and bot health.
   - `🌐 /panel` - Direct link to the Web Management Panel.
-  - `💻 /ssh` - The exact SSH command with the current Funnel port.
+  - `💻 /ssh` - The exact private Tailscale SSH command.
 - **Continuous 24/7 Uptime**:
   - 5-hour and 45-minute runner cycle with automated handoff triggering the next GitHub Actions workflow.
 
@@ -67,10 +65,10 @@ repository/
 When the workflow boots:
 1. **Cloudflare Tunnel** publishes the Web Control Panel at a temporary `https://<random>.trycloudflare.com` URL.
 2. **Tailscale** connects the runner to your tailnet using `TAILSCALE_AUTHKEY` (hostname `bot-server`).
-3. **Tailscale Funnel** publishes `tcp://localhost:22` publicly on port 443 (or 8443/10000 if 443 is taken).
+3. **Tailscale** exposes SSH on port 22 through MagicDNS and binds `sshd` to the Tailscale address.
 4. The exact SSH command and Cloudflare Panel URL are sent to Telegram and printed in the workflow log.
 
-> **Note**: Funnel must be allowed for the node. In the Tailscale admin console, ensure your tailnet policy contains a `nodeAttrs` block granting funnel, or enable HTTPS/MagicDNS for the tailnet when prompted.
+> **Note**: MagicDNS must be enabled for the advertised `.ts.net` hostname. Tailscale ACLs still control which logged-in tailnet devices may connect.
 
 ## GitHub Configuration
 
@@ -85,7 +83,7 @@ When the workflow boots:
 | Secret | Description | Default (if unset) |
 |---|---|---|
 | `SERVER_PASSWORD` | Web Panel & SSH login password | `admin` |
-| `TAILSCALE_AUTHKEY` | Tailscale auth key (reusable/Ephemeral off, with Funnel-capable device approval) | None |
+| `TAILSCALE_AUTHKEY` | Tailscale auth key used to join the runner to your tailnet | None |
 | `GH_PAT` | Personal Access Token (`ArashAtomic`) to trigger workflow redeploys | None |
 | `CLONE_PAT` | Personal Access Token (`ArashMaghsoodi`) to clone private `love-whispers-bot` | None |
 | `LOVE_WHISPERS_ENV` | Complete `.env` content for Love Whispers | None |

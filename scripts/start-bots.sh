@@ -13,7 +13,7 @@ LOVE_WHISPERS_DIR="$BOT_DIR/love-whispers-bot"
 PACKTOGETHER_DIR="$BOT_DIR/PackTogether"
 
 echo "======================================"
-echo "Starting bots, Panel, Cloudflare Tunnel, and Tailscale Funnel"
+echo "Starting bots, Panel, Cloudflare Tunnel, and private Tailscale SSH"
 echo "======================================"
 
 # Read persistent bot enabled flags
@@ -229,7 +229,7 @@ else
     echo "http://localhost:8080" > /tmp/panel_url.txt
 fi
 
-# Connect Tailscale and configure Tailscale Funnel for SSH
+# Connect Tailscale for private SSH access over the tailnet
 echo
 echo "==> Connecting Tailscale"
 
@@ -238,6 +238,12 @@ if [ -n "${TAILSCALE_AUTHKEY:-}" ]; then
 else
     echo "WARNING: TAILSCALE_AUTHKEY is not configured."
 fi
+
+# Remove Funnel state left by older deployments before enabling private SSH.
+sudo systemctl disable --now tailscale-funnel.service 2>/dev/null || true
+sudo rm -f /etc/systemd/system/tailscale-funnel.service
+sudo systemctl daemon-reload 2>/dev/null || true
+sudo tailscale funnel off 2>/dev/null || true
 
 # Verify Tailscale status
 tailscale status || true
@@ -249,86 +255,38 @@ fi
 
 echo "Tailscale Domain: ${TS_DOMAIN:-unknown}"
 
-# Configure Tailscale Funnel for SSH (Port 443 preferred, fallback 8443, 10000)
-FUNNEL_PORT=""
-setup_ssh_funnel() {
-    local target_port="$1"
-    echo "Trying Tailscale Funnel on port $target_port -> localhost:22..."
-
-    timeout --signal=TERM 45s sudo -n tailscale funnel --yes --bg --tcp="$target_port" tcp://127.0.0.1:22 \
-        >> /tmp/funnel_ssh.log 2>&1
-    local exit_code=$?
-    if [ "$exit_code" -ne 0 ]; then
-        if [ "$exit_code" -eq 124 ]; then
-            echo "Funnel setup timed out after 45 seconds on port $target_port." >> /tmp/funnel_ssh.log
-        else
-            echo "Funnel setup failed on port $target_port with exit code $exit_code." >> /tmp/funnel_ssh.log
-        fi
-        return 1
+# SSH remains on port 22 and is reachable through Tailscale MagicDNS only.
+TS_IP=$(tailscale ip -4 2>/dev/null | head -n 1 || true)
+if [ -n "$TS_IP" ]; then
+    printf 'ListenAddress %s\n' "$TS_IP" | sudo tee /etc/ssh/sshd_config.d/tailscale.conf >/dev/null
+    if sudo sshd -t; then
+        sudo systemctl restart ssh || sudo service ssh restart || true
+        echo "SSH is listening on Tailscale address $TS_IP only."
+    else
+        echo "WARNING: Invalid SSH configuration; restoring unrestricted SSH listener."
+        sudo rm -f /etc/ssh/sshd_config.d/tailscale.conf
+        sudo systemctl restart ssh || sudo service ssh restart || true
     fi
-
-    sudo tailscale funnel status --json > /tmp/funnel_status.json 2>> /tmp/funnel_ssh.log || return 1
-    if ! grep -q "\"$target_port\"\|:$target_port\|$target_port" /tmp/funnel_status.json || \
-       ! grep -q "127.0.0.1:22\|localhost:22" /tmp/funnel_status.json; then
-        echo "Funnel status does not show TCP port $target_port forwarding to SSH." >> /tmp/funnel_ssh.log
-        return 1
-    fi
-
-    return 0
-}
-
-for PORT in 443 8443 10000; do
-    if setup_ssh_funnel "$PORT"; then
-        FUNNEL_PORT="$PORT"
-        echo "SUCCESS: Tailscale Funnel active for SSH on port $FUNNEL_PORT"
-        break
-    fi
-done
-
-if [ -z "$FUNNEL_PORT" ]; then
-    echo "WARNING: Tailscale Funnel could not be configured for SSH."
-    echo "Funnel diagnostics:"
-    sed 's/TAILSCALE_AUTHKEY=.*/TAILSCALE_AUTHKEY=[redacted]/' /tmp/funnel_ssh.log 2>/dev/null || true
+else
+    echo "WARNING: Tailscale IPv4 address unavailable; SSH listener was not restricted."
 fi
 
-# Persist Funnel configuration across reboots via systemd service
-if [ -n "$FUNNEL_PORT" ]; then
-    cat <<EOF | sudo tee /etc/systemd/system/tailscale-funnel.service >/dev/null
-[Unit]
-Description=Tailscale Funnel Public SSH Forwarding
-After=tailscaled.service
-Wants=tailscaled.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/bin/tailscale funnel --yes --bg --tcp=${FUNNEL_PORT} tcp://127.0.0.1:22
-ExecStop=/usr/bin/tailscale funnel --tcp=${FUNNEL_PORT} tcp://127.0.0.1:22 off
-
-[Install]
-WantedBy=multi-user.target
-EOF
-    sudo systemctl daemon-reload 2>/dev/null || true
-    sudo systemctl enable tailscale-funnel.service 2>/dev/null || true
-fi
-
-# Check Tailscale Funnel status
 echo
-echo "==> Tailscale Funnel Status:"
-tailscale funnel status 2>/dev/null || tailscale serve status 2>/dev/null || true
+echo "==> Tailscale Status:"
+tailscale status || true
 
-# Construct public SSH command & Panel URL
-if [ -n "$TS_DOMAIN" ] && [ -n "$FUNNEL_PORT" ]; then
-    SSH_CMD="ssh -p $FUNNEL_PORT $SSH_USER@$TS_DOMAIN"
+# Construct private tailnet SSH command & Panel URL
+if [ -n "$TS_DOMAIN" ]; then
+    SSH_CMD="ssh $SSH_USER@$TS_DOMAIN"
     echo "$SSH_CMD" > /tmp/ssh_cmd.txt
 else
-    SSH_CMD="SSH unavailable: Tailscale Funnel is not active"
+    SSH_CMD="SSH unavailable: Tailscale is not connected"
     echo "$SSH_CMD" > /tmp/ssh_cmd.txt
 fi
 
 echo
 echo "======================================"
-echo "Processes, Cloudflare Tunnel, and SSH Funnel Active"
+echo "Processes, Cloudflare Tunnel, and private Tailscale SSH Active"
 echo "======================================"
 
 echo "Web Panel URL : $(cat /tmp/panel_url.txt)"

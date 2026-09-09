@@ -127,7 +127,6 @@ jobs:
             /tmp/packtogether.log
             /tmp/panel.log
             /tmp/cloudflared.log
-            /tmp/funnel_ssh.log
             /tmp/hermes.log
             /tmp/9router.log
           if-no-files-found: warn

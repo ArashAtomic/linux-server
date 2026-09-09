@@ -83,7 +83,7 @@ TELEGRAM_MSG="<b>🚀 BOT SERVER IS ONLINE</b>
 <a href=\"${PANEL_URL}\">${PANEL_URL}</a>
 <i>Username:</i> <code>${USER_NAME}</code>
 
-<b>💻 SSH Terminal Access (Tailscale Funnel)</b>
+<b>💻 SSH Terminal Access (private Tailscale network)</b>
 <code>${SSH_CMD}</code>
 
 <b>🤖 Bot Status</b>
