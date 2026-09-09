@@ -40,6 +40,7 @@ repository/
 - **9Router local AI gateway**:
   - Runs privately on `127.0.0.1:20128` using the official `decolua/9router:latest` Docker image.
   - Dashboard: `http://127.0.0.1:20128/dashboard` through SSH/local access.
+  - Dashboard password is aligned with `SERVER_PASSWORD`; no separate 9Router password is required.
   - OpenAI-compatible API: `http://127.0.0.1:20128/v1`.
   - Persistent database and configuration are stored in `~/.9router` and restored through the `9router-state-*` Actions cache.
   - Select **9Router (local)** in Server Assistant → Providers, enter the 9Router API key from its dashboard, fetch models, choose one, and save.

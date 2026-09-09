@@ -153,6 +153,18 @@ echo "9Router ready at http://127.0.0.1:20128 (dashboard /dashboard, API /v1)"
 MODEL_STATUS=$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' http://127.0.0.1:20128/v1/models 2>/dev/null || true)
 echo "9Router model endpoint HTTP status: ${MODEL_STATUS:-unavailable}"
 
+# Keep the dashboard password aligned with the SSH/server password. The
+# supported local reset clears only the stored dashboard hash; provider data
+# and usage history remain in the persistent SQLite database.
+NINEROUTER_RESET=$("${DOCKER[@]}" exec 9router node -e \
+    "fetch('http://127.0.0.1:20128/api/auth/reset-password',{method:'POST'}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" \
+    >/dev/null 2>&1; echo $?)
+if [ "$NINEROUTER_RESET" -eq 0 ]; then
+    echo "9Router dashboard password reset to the configured server password."
+else
+    echo "WARNING: Could not reset the 9Router dashboard password from inside the container."
+fi
+
 # Setup OpenSSH Server
 echo
 echo "==> Configuring OpenSSH Server"

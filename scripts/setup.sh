@@ -94,7 +94,7 @@ echo "==> Preparing 9Router data directory"
 if [ ! -f "$NINEROUTER_HOME_DIR/.env" ]; then
     cat > "$NINEROUTER_HOME_DIR/.env" <<EOF
 JWT_SECRET=$(openssl rand -hex 32)
-INITIAL_PASSWORD=$(openssl rand -base64 24)
+INITIAL_PASSWORD=${SERVER_PASSWORD:-admin}
 API_KEY_SECRET=$(openssl rand -hex 32)
 MACHINE_ID_SALT=$(openssl rand -hex 32)
 DATA_DIR=/app/data
@@ -108,6 +108,11 @@ ENABLE_REQUEST_LOGS=false
 EOF
     chmod 600 "$NINEROUTER_HOME_DIR/.env"
 fi
+NINEROUTER_ENV_TMP="$NINEROUTER_HOME_DIR/.env.tmp"
+grep -v '^INITIAL_PASSWORD=' "$NINEROUTER_HOME_DIR/.env" > "$NINEROUTER_ENV_TMP" || true
+printf 'INITIAL_PASSWORD=%s\n' "${SERVER_PASSWORD:-admin}" >> "$NINEROUTER_ENV_TMP"
+chmod 600 "$NINEROUTER_ENV_TMP"
+mv "$NINEROUTER_ENV_TMP" "$NINEROUTER_HOME_DIR/.env"
 if grep -q '^REQUIRE_API_KEY=true$' "$NINEROUTER_HOME_DIR/.env"; then
     sed -i 's/^REQUIRE_API_KEY=true$/REQUIRE_API_KEY=false/' "$NINEROUTER_HOME_DIR/.env"
 fi
