@@ -44,7 +44,6 @@ jobs:
           CLONE_PAT: ${{ secrets.CLONE_PAT || secrets.GH_PAT }}
           LOVE_WHISPERS_ENV: ${{ secrets.LOVE_WHISPERS_ENV }}
           PACKTOGETHER_ENV: ${{ secrets.PACKTOGETHER_ENV }}
-          HERMES_ENV: ${{ secrets.HERMES_ENV }}
         run: ./scripts/setup.sh
 
       - name: Start Telegram Bots, Panel & Tunnels
@@ -88,11 +87,6 @@ jobs:
       - name: Stop Bots, Panel & Tunnels
         if: always()
         run: ./scripts/stop-bots.sh
-
-      - name: Prepare Hermes State Cache
-        if: always()
-        run: |
-          rm -f /home/runner/.hermes/.env /home/runner/.hermes/auth.json
 
       - name: Save Persistent Bot State
         if: always()

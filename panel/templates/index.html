@@ -406,11 +406,28 @@
                     <div class="live-indicator"><span></span>HERMES</div>
                     <div id="assistant-status" class="log-meta">Checking assistant...</div>
                     <button class="btn" onclick="newAssistantChat()">＋ New Chat</button>
+                    <button class="btn" onclick="toggleProviderPanel()">⚙ Providers</button>
                     <button class="btn btn-stop" id="assistant-stop" onclick="stopAssistant()" disabled>⏹ Stop</button>
                 </div>
                 <div class="console-body assistant-chat">
                     <div id="assistant-messages" class="assistant-messages"></div>
                     <div id="assistant-activity" class="assistant-activity"></div>
+                    <div id="assistant-provider-panel" class="console-toolbar" style="display:none; flex-wrap:wrap;">
+                        <select id="assistant-provider" class="bot-select">
+                            <option value="openrouter">OpenRouter</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="anthropic">Anthropic</option>
+                            <option value="google">Google Gemini</option>
+                            <option value="xai">xAI</option>
+                            <option value="deepseek">DeepSeek</option>
+                            <option value="groq">Groq</option>
+                            <option value="github_copilot">GitHub Copilot</option>
+                            <option value="telegram">Hermes Telegram</option>
+                        </select>
+                        <input id="assistant-provider-value" class="log-search" type="password" placeholder="Provider key or token">
+                        <button class="btn btn-start" onclick="saveAssistantProvider()">Save & Restart Hermes</button>
+                        <span id="assistant-provider-status" class="log-meta"></span>
+                    </div>
                     <div class="assistant-composer">
                         <div id="assistant-suggestions" class="assistant-suggestions"></div>
                         <textarea id="assistant-input" class="assistant-input" rows="2" placeholder="Ask Hermes to inspect or manage the server..."></textarea>
@@ -627,6 +644,36 @@
             document.getElementById('assistant-status').innerText = data.available ? `READY · ${data.model}` : (data.error || 'UNAVAILABLE');
         } catch (e) {
             document.getElementById('assistant-status').innerText = 'UNAVAILABLE';
+        }
+    }
+
+    function toggleProviderPanel() {
+        const panel = document.getElementById('assistant-provider-panel');
+        panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+    }
+
+    async function saveAssistantProvider() {
+        const provider = document.getElementById('assistant-provider').value;
+        const valueInput = document.getElementById('assistant-provider-value');
+        const status = document.getElementById('assistant-provider-status');
+        const value = valueInput.value.trim();
+        if (!value) return showToast('Enter a provider key or token.', 'error');
+        status.innerText = 'Saving...';
+        try {
+            const res = await fetch('/api/assistant/providers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider, value })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Provider save failed');
+            valueInput.value = '';
+            status.innerText = 'Saved and Hermes restarted';
+            showToast(`${provider} configured.`, 'success');
+            setTimeout(checkAssistant, 1500);
+        } catch (error) {
+            status.innerText = error.message;
+            showToast(error.message, 'error');
         }
     }
 

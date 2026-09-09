@@ -22,6 +22,19 @@ START_TIME = time.time()
 HERMES_API_URL = os.environ.get("HERMES_API_URL", "http://127.0.0.1:8642")
 HERMES_API_KEY = os.environ.get("HERMES_API_SERVER_KEY", "")
 HERMES_MODEL = os.environ.get("HERMES_MODEL", "hermes-agent")
+HERMES_HOME = os.environ.get("HERMES_HOME", os.path.expanduser("~/.hermes"))
+HERMES_ENV_FILE = os.path.join(HERMES_HOME, ".env")
+HERMES_PROVIDER_KEYS = {
+    "openrouter": "OPENROUTER_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
+    "google": "GOOGLE_API_KEY",
+    "xai": "XAI_API_KEY",
+    "deepseek": "DEEPSEEK_API_KEY",
+    "groq": "GROQ_API_KEY",
+    "github_copilot": "COPILOT_GITHUB_TOKEN",
+    "telegram": "TELEGRAM_BOT_TOKEN"
+}
 ACTIVE_HERMES_REQUESTS = {}
 ACTIVE_HERMES_REQUESTS_LOCK = Lock()
 
@@ -84,6 +97,62 @@ def hermes_headers():
         "Authorization": f"Bearer {HERMES_API_KEY}",
         "Accept": "application/json"
     }
+
+def read_hermes_env():
+    values = {}
+    if not os.path.isfile(HERMES_ENV_FILE):
+        return values
+    try:
+        with open(HERMES_ENV_FILE, "r") as env_file:
+            for line in env_file:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
+                    values[key.strip()] = value.strip()
+    except OSError:
+        pass
+    return values
+
+def write_hermes_env(values):
+    os.makedirs(HERMES_HOME, mode=0o700, exist_ok=True)
+    temp_path = f"{HERMES_ENV_FILE}.tmp"
+    with open(temp_path, "w") as env_file:
+        for key, value in sorted(values.items()):
+            env_file.write(f"{key}={value}\n")
+    os.chmod(temp_path, 0o600)
+    os.replace(temp_path, HERMES_ENV_FILE)
+
+def restart_hermes():
+    pid_path = "/tmp/hermes.pid"
+    if os.path.isfile(pid_path):
+        try:
+            with open(pid_path, "r") as pid_file:
+                pid = int(pid_file.read().strip())
+            os.kill(pid, signal.SIGTERM)
+            for _ in range(20):
+                if not psutil.pid_exists(pid):
+                    break
+                time.sleep(0.25)
+        except (OSError, ValueError):
+            pass
+
+    env = os.environ.copy()
+    env.update({
+        "HERMES_HOME": HERMES_HOME,
+        "API_SERVER_ENABLED": "true",
+        "API_SERVER_HOST": "127.0.0.1",
+        "API_SERVER_PORT": "8642",
+        "API_SERVER_KEY": HERMES_API_KEY
+    })
+    process = subprocess.Popen(
+        ["hermes", "gateway"],
+        stdout=open("/tmp/hermes.log", "a"),
+        stderr=subprocess.STDOUT,
+        env=env,
+        start_new_session=True
+    )
+    with open(pid_path, "w") as pid_file:
+        pid_file.write(str(process.pid))
 
 def login_required(f):
     @wraps(f)
@@ -380,6 +449,37 @@ def assistant_health():
         return jsonify({"available": True, "model": HERMES_MODEL})
     except requests.RequestException:
         return jsonify({"available": False, "error": "Hermes is unavailable"}), 503
+
+@app.route("/api/assistant/providers")
+@login_required
+def assistant_providers():
+    values = read_hermes_env()
+    return jsonify({
+        "providers": [
+            {"name": name, "configured": bool(values.get(env_key))}
+            for name, env_key in HERMES_PROVIDER_KEYS.items()
+        ]
+    })
+
+@app.route("/api/assistant/providers", methods=["POST"])
+@login_required
+def configure_assistant_provider():
+    payload = request.get_json(silent=True) or {}
+    provider = payload.get("provider")
+    value = payload.get("value")
+    if provider not in HERMES_PROVIDER_KEYS or not isinstance(value, str) or not value.strip():
+        return jsonify({"error": "Select a supported provider and enter a value"}), 400
+    if len(value) > 5000 or "\n" in value or "\r" in value:
+        return jsonify({"error": "Provider value is invalid"}), 400
+
+    values = read_hermes_env()
+    values[HERMES_PROVIDER_KEYS[provider]] = value.strip()
+    try:
+        write_hermes_env(values)
+        restart_hermes()
+    except (OSError, subprocess.SubprocessError) as error:
+        return jsonify({"error": f"Provider saved but Hermes could not restart: {error}"}), 503
+    return jsonify({"success": True, "provider": provider, "restarted": True})
 
 @app.route("/api/assistant/chat", methods=["POST"])
 @login_required

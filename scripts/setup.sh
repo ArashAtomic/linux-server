@@ -63,11 +63,6 @@ hermes --version
 mkdir -p "$HERMES_HOME_DIR"
 chmod 700 "$HERMES_HOME_DIR"
 
-if [ -n "${HERMES_ENV:-}" ]; then
-    printf '%s\n' "$HERMES_ENV" > "$HERMES_HOME_DIR/.env"
-    chmod 600 "$HERMES_HOME_DIR/.env"
-fi
-
 echo
 echo "==> Installing Python 3.12"
 

@@ -35,6 +35,8 @@ repository/
   - Live log streaming with search filter and pause/resume.
   - Environment variables viewer with secret masking toggle.
   - File Explorer for browsing directory contents and viewing source files.
+  - **Server Assistant** powered by Hermes Agent, with streamed chat, compact tool activity, Stop control, and curated command autocomplete.
+  - Provider setup from the authenticated panel; provider credentials are stored in Hermes state and restored on redeploy.
 - **Public SSH Access (Tailscale Funnel)**:
   - Exposes the VM's OpenSSH server (port 22) to the public internet via Tailscale Funnel.
   - Port priority: **443** → fallback **8443** → fallback **10000**.
@@ -83,6 +85,19 @@ When the workflow boots:
 | `PACKTOGETHER_ENV` | Complete `.env` content for PackTogether | None |
 | `STATUS_BOT_TOKEN` | Telegram bot token for status notifications & commands | None |
 | `STATUS_CHAT_ID` | Telegram chat ID for notifications & commands | None |
+| `HERMES_API_SERVER_KEY` | Strong bearer key used internally between the panel and Hermes | Required |
+
+### Hermes Provider Setup
+
+Provider API keys are intentionally **not required during workflow setup**. After the server is online:
+
+1. Open the Web Control Panel and select **Server Assistant**.
+2. Open **Providers**.
+3. Choose a provider, enter its API key or token, and select **Save & Restart Hermes**.
+
+The value is written to the runner's `~/.hermes/.env` with restricted permissions. Hermes state, including configured providers, is saved to and restored from the `hermes-state-*` Actions cache during runner replacement. The API key used by the panel itself remains the separate `HERMES_API_SERVER_KEY` GitHub secret.
+
+Supported provider entries currently include OpenRouter, OpenAI, Anthropic, Google Gemini, xAI, DeepSeek, Groq, GitHub Copilot, and the Hermes Telegram bot token.
 
 ## Starting
 

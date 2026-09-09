@@ -1,0 +1,139 @@
+## Hermes Server Assistant Implementation Plan
+
+### Goal
+
+Run Hermes Agent on the ephemeral GitHub Actions runner while keeping the existing Flask panel as the only public web entry point. Hermes provides the agent, tools, sessions, memory, and provider integrations. Flask provides authenticated web access and a compact assistant UI.
+
+### Architecture
+
+```text
+Browser
+  -> Flask panel session
+  -> authenticated Flask Hermes proxy
+  -> Hermes API on 127.0.0.1:8642
+  -> Hermes tools, sessions, skills, memory, and providers
+```
+
+Hermes' native dashboard remains loopback-only and is not exposed through the public Cloudflare tunnel in the first implementation.
+
+### Phase 1: Security And Runtime
+
+1. Validate both panel username and password.
+2. Use a stable `FLASK_SECRET_KEY` from a protected secret.
+3. Add secure session-cookie settings, CSRF protection, and login throttling.
+4. Run Hermes as the non-root runner user with `/home/runner/bot-server` as its working directory.
+5. Bind Hermes only to `127.0.0.1:8642`.
+6. Keep Hermes approvals in smart/manual mode initially.
+7. Avoid passing unrelated GitHub, Telegram, bot, or SSH secrets into Hermes tools.
+8. Treat public SSH and passwordless sudo as a separate high-risk boundary requiring later hardening.
+
+### Phase 2: Hermes Installation And Lifecycle
+
+1. Install Hermes from the supported installer in `scripts/setup.sh`.
+2. Create and protect `~/.hermes`.
+3. Start Hermes from `scripts/start-bots.sh` with the local API server enabled.
+4. Verify `/health` before the panel becomes usable.
+5. Track Hermes with `/tmp/hermes.pid` and `/tmp/hermes.log`.
+6. Stop Hermes before saving workflow state in `scripts/stop-bots.sh`.
+7. Upload Hermes logs with the other workflow logs.
+8. Keep ports `8642` and `9119` private.
+
+### Phase 3: Persistent State
+
+1. Restore `/home/runner/.hermes` using the `hermes-state-*` cache namespace.
+2. Save Hermes state after Hermes has stopped cleanly.
+3. Preserve configuration, sessions, memories, skills, cron data, and provider credentials.
+4. Do not delete `~/.hermes/.env` or `~/.hermes/auth.json` before cache save.
+5. Do not require a pre-boot `HERMES_ENV` secret for provider setup.
+6. Document that GitHub Actions cache is convenient handoff storage, not guaranteed durable backup.
+7. Move important state to encrypted external storage or a persistent VPS volume later.
+
+### Phase 4: Provider Setup
+
+Providers are configured after the server is online rather than during workflow provisioning.
+
+1. Open the panel's `Server Assistant` tab.
+2. Open `Providers`.
+3. Select a supported provider.
+4. Enter its API key or token.
+5. Save and restart Hermes.
+6. Hermes stores the credential in `~/.hermes/.env` with mode `600`.
+7. The provider survives the next runner redeployment through the Hermes state cache.
+
+Supported provider entries currently include:
+
+- OpenRouter
+- OpenAI
+- Anthropic
+- Google Gemini
+- xAI
+- DeepSeek
+- Groq
+- GitHub Copilot
+- Hermes Telegram
+
+`HERMES_API_SERVER_KEY` is separate. It is a self-generated random bearer secret used only by Flask to authenticate to the local Hermes API.
+
+### Phase 5: Flask Proxy
+
+1. Protect every assistant route with the existing Flask session.
+2. Keep the Hermes bearer key server-side.
+3. Proxy only to the fixed local Hermes URL.
+4. Bound request size and message count.
+5. Reject browser-supplied system messages, arbitrary URLs, headers, models, and tools.
+6. Relay Hermes SSE responses safely.
+7. Normalize Hermes unavailable, timeout, malformed response, and authorization errors.
+8. Track active requests server-side and support authenticated cancellation.
+9. Add explicit session mapping before relying on durable multi-chat history.
+10. Add structured approval and clarification events before enabling destructive operations through the browser.
+
+### Phase 6: Panel Assistant UX
+
+1. Add a `Server Assistant` tab.
+2. Stream final text into one assistant bubble.
+3. Keep tool activity compact and replaceable instead of creating one message per tool call.
+4. Provide New Chat and Stop controls.
+5. Show Hermes availability and model status.
+6. Provide curated autocomplete for:
+
+```text
+/help /new /reset /status /stop /model /tools /skills
+/sessions /resume /bg /approve /deny /compress /sethome
+```
+
+Advanced commands remain manually available and can later be exposed through a secondary full-command search.
+
+7. Add safe Markdown rendering, code blocks, long-output handling, and file delivery.
+8. Preserve unsent text and reconnect gracefully on mobile and desktop.
+
+### Phase 7: Documentation And Verification
+
+Update `README.md` with setup, secrets, provider configuration, persistence limits, approvals, recovery, and security notes.
+
+Verification checklist:
+
+- `bash -n scripts/setup.sh`
+- `bash -n scripts/start-bots.sh`
+- `bash -n scripts/stop-bots.sh`
+- `python -m py_compile panel/app.py`
+- Embedded JavaScript syntax validation
+- Flask authentication and session tests
+- Hermes proxy tests for bearer-key protection and payload limits
+- SSE streaming and cancellation tests
+- Provider save/restart smoke test
+- Hermes `/health` and `/v1/models` smoke tests on Ubuntu
+- Cache restore/save test with seeded Hermes state
+- Browser test for assistant streaming, autocomplete, Stop, provider setup, logout, and mobile layout
+- Tunnel test confirming only the Flask panel is public
+
+### Scope Decisions
+
+- Use Hermes API plus Flask proxy, not an iframe.
+- Keep Hermes API and native dashboard loopback-only.
+- Configure providers after boot through the panel.
+- Persist provider configuration in Hermes state.
+- Keep autocomplete curated.
+- Hide individual tool-call messages by default.
+- Start with smart/manual approvals.
+- Keep Telegram Hermes integration separate from the existing status bot.
+- Leave native Hermes dashboard exposure, public OAuth/OIDC, multi-user accounts, and SSH redesign outside the first release.
