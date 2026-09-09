@@ -53,8 +53,20 @@ tailscale version || true
 
 echo
 echo "==> Installing Hermes Agent"
-curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
 export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$PATH"
+
+HERMES_CACHED=false
+if command -v hermes >/dev/null 2>&1 && [ -d "$HERMES_HOME_DIR/hermes-agent" ]; then
+    HERMES_CACHED=true
+    echo "Hermes installation found in the restored runner cache; skipping update."
+fi
+
+if [ "$HERMES_CACHED" = "false" ]; then
+    echo "No complete cached Hermes installation found; fetching the latest version."
+    curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
+    export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$PATH"
+fi
+
 if ! command -v hermes >/dev/null 2>&1; then
     echo "ERROR: Hermes Agent installation did not provide the hermes command."
     exit 1
