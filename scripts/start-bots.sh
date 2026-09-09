@@ -147,8 +147,15 @@ setup_ssh_funnel() {
     local target_port="$1"
     echo "Trying Tailscale Funnel on port $target_port -> localhost:22..."
 
-    if ! sudo tailscale funnel --yes --bg --tcp="$target_port" tcp://127.0.0.1:22 \
-        >> /tmp/funnel_ssh.log 2>&1; then
+    timeout --signal=TERM 45s sudo -n tailscale funnel --yes --bg --tcp="$target_port" tcp://127.0.0.1:22 \
+        >> /tmp/funnel_ssh.log 2>&1
+    local exit_code=$?
+    if [ "$exit_code" -ne 0 ]; then
+        if [ "$exit_code" -eq 124 ]; then
+            echo "Funnel setup timed out after 45 seconds on port $target_port." >> /tmp/funnel_ssh.log
+        else
+            echo "Funnel setup failed on port $target_port with exit code $exit_code." >> /tmp/funnel_ssh.log
+        fi
         return 1
     fi
 
