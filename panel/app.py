@@ -12,6 +12,8 @@ from functools import wraps
 from flask import Flask, Response, jsonify, render_template, request, session, redirect, stream_with_context, url_for
 import psutil
 import requests
+import yaml
+from urllib.parse import urlparse
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
@@ -33,7 +35,9 @@ HERMES_PROVIDER_KEYS = {
     "deepseek": "DEEPSEEK_API_KEY",
     "groq": "GROQ_API_KEY",
     "github_copilot": "COPILOT_GITHUB_TOKEN",
-    "telegram": "TELEGRAM_BOT_TOKEN"
+    "telegram": "TELEGRAM_BOT_TOKEN",
+    "custom": "OPENAI_API_KEY",
+    "ninerouter": "OPENAI_API_KEY"
 }
 ACTIVE_HERMES_REQUESTS = {}
 ACTIVE_HERMES_REQUESTS_LOCK = Lock()
@@ -121,6 +125,32 @@ def write_hermes_env(values):
             env_file.write(f"{key}={value}\n")
     os.chmod(temp_path, 0o600)
     os.replace(temp_path, HERMES_ENV_FILE)
+
+def valid_provider_url(value):
+    parsed = urlparse(value)
+    return parsed.scheme in ["http", "https"] and bool(parsed.netloc) and len(value) <= 500
+
+def write_hermes_model(provider, model, base_url=None):
+    config_path = os.path.join(HERMES_HOME, "config.yaml")
+    config = {}
+    if os.path.isfile(config_path):
+        try:
+            with open(config_path, "r") as config_file:
+                config = yaml.safe_load(config_file) or {}
+        except (OSError, yaml.YAMLError):
+            config = {}
+    model_config = config.setdefault("model", {})
+    model_config["provider"] = provider
+    model_config["default"] = model
+    if base_url:
+        model_config["base_url"] = base_url.rstrip("/")
+    elif provider != "custom":
+        model_config.pop("base_url", None)
+    temp_path = f"{config_path}.tmp"
+    with open(temp_path, "w") as config_file:
+        yaml.safe_dump(config, config_file, sort_keys=False)
+    os.chmod(temp_path, 0o600)
+    os.replace(temp_path, config_path)
 
 def restart_hermes():
     pid_path = "/tmp/hermes.pid"
@@ -467,8 +497,16 @@ def configure_assistant_provider():
     payload = request.get_json(silent=True) or {}
     provider = payload.get("provider")
     value = payload.get("value")
+    model = payload.get("model", "")
+    base_url = payload.get("base_url", "")
     if provider not in HERMES_PROVIDER_KEYS or not isinstance(value, str) or not value.strip():
         return jsonify({"error": "Select a supported provider and enter a value"}), 400
+    if not isinstance(model, str) or len(model) > 300 or "\n" in model or "\r" in model:
+        return jsonify({"error": "Model is invalid"}), 400
+    if provider == "ninerouter":
+        base_url = "http://127.0.0.1:20128/v1"
+    if provider in ["custom", "ninerouter"] and not valid_provider_url(base_url):
+        return jsonify({"error": "Custom provider URL must be a valid HTTP or HTTPS URL"}), 400
     if len(value) > 5000 or "\n" in value or "\r" in value:
         return jsonify({"error": "Provider value is invalid"}), 400
 
@@ -476,10 +514,38 @@ def configure_assistant_provider():
     values[HERMES_PROVIDER_KEYS[provider]] = value.strip()
     try:
         write_hermes_env(values)
+        if model:
+            write_hermes_model("custom", model, base_url if provider in ["custom", "ninerouter"] else None)
+            global HERMES_MODEL
+            HERMES_MODEL = model
         restart_hermes()
     except (OSError, subprocess.SubprocessError) as error:
         return jsonify({"error": f"Provider saved but Hermes could not restart: {error}"}), 503
     return jsonify({"success": True, "provider": provider, "restarted": True})
+
+@app.route("/api/assistant/models", methods=["POST"])
+@login_required
+def fetch_assistant_models():
+    payload = request.get_json(silent=True) or {}
+    base_url = payload.get("base_url", "").strip().rstrip("/")
+    api_key = payload.get("api_key", "")
+    if not valid_provider_url(base_url):
+        return jsonify({"error": "Enter a valid HTTP or HTTPS provider URL"}), 400
+    if not isinstance(api_key, str) or len(api_key) > 5000 or "\n" in api_key or "\r" in api_key:
+        return jsonify({"error": "Provider key is invalid"}), 400
+    try:
+        response = requests.get(
+            f"{base_url}/models",
+            headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
+            timeout=15
+        )
+        if not response.ok:
+            return jsonify({"error": f"Provider returned HTTP {response.status_code}"}), 502
+        data = response.json()
+        models = [item.get("id") for item in data.get("data", []) if isinstance(item, dict) and item.get("id")]
+        return jsonify({"models": models[:500]})
+    except (requests.RequestException, ValueError):
+        return jsonify({"error": "Could not fetch models from provider"}), 502
 
 @app.route("/api/assistant/chat", methods=["POST"])
 @login_required

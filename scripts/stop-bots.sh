@@ -48,6 +48,10 @@ stop_process "Hermes Agent" "/tmp/hermes.pid"
 stop_process "Management Panel" "/tmp/panel.pid"
 stop_process "Cloudflare Tunnel" "/tmp/cloudflared.pid"
 
+if command -v docker >/dev/null 2>&1; then
+    docker stop 9router >/dev/null 2>&1 || sudo -n docker stop 9router >/dev/null 2>&1 || true
+fi
+
 rm -f /tmp/panel_url.txt /tmp/cloudflared.url /tmp/ssh_cmd.txt /tmp/cloudflared.log /tmp/funnel_ssh.log
 
 echo

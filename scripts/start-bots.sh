@@ -7,6 +7,7 @@ BOT_DIR="$BASE_DIR/bots"
 PANEL_DIR="$BASE_DIR/panel"
 STATE_FILE="$BASE_DIR/state.json"
 HERMES_HOME_DIR="$HOME/.hermes"
+NINEROUTER_HOME_DIR="$HOME/.9router"
 
 LOVE_WHISPERS_DIR="$BOT_DIR/love-whispers-bot"
 PACKTOGETHER_DIR="$BOT_DIR/PackTogether"
@@ -104,6 +105,48 @@ if [ "$HERMES_READY" != "true" ]; then
     exit 1
 fi
 echo "Hermes Agent PID: $HERMES_PID (API 127.0.0.1:8642)"
+
+# 9Router OpenAI-compatible gateway
+echo
+echo "==> Starting 9Router"
+if ! command -v docker >/dev/null 2>&1; then
+    echo "ERROR: Docker is required to run 9Router."
+    exit 1
+fi
+if ! docker info >/dev/null 2>&1 && ! sudo -n docker info >/dev/null 2>&1; then
+    echo "ERROR: Docker daemon is not available for 9Router."
+    exit 1
+fi
+
+DOCKER=(docker)
+if ! docker info >/dev/null 2>&1; then
+    DOCKER=(sudo -n docker)
+fi
+
+> /tmp/9router.log
+"${DOCKER[@]}" pull decolua/9router:latest >> /tmp/9router.log 2>&1
+"${DOCKER[@]}" rm -f 9router >> /tmp/9router.log 2>&1 || true
+"${DOCKER[@]}" run -d --name 9router --restart unless-stopped \
+    -p 127.0.0.1:20128:20128 \
+    -v "$NINEROUTER_HOME_DIR:/app/data" \
+    --env-file "$NINEROUTER_HOME_DIR/.env" \
+    -e DATA_DIR=/app/data -e PORT=20128 -e HOSTNAME=0.0.0.0 \
+    decolua/9router:latest >> /tmp/9router.log 2>&1
+
+NINEROUTER_READY=false
+for i in {1..30}; do
+    if curl -fsS --max-time 2 http://127.0.0.1:20128/v1/models >/dev/null 2>&1; then
+        NINEROUTER_READY=true
+        break
+    fi
+    sleep 1
+done
+if [ "$NINEROUTER_READY" != "true" ]; then
+    echo "ERROR: 9Router did not become ready within 30 seconds."
+    "${DOCKER[@]}" logs --tail 40 9router >> /tmp/9router.log 2>&1 || true
+    exit 1
+fi
+echo "9Router ready at http://127.0.0.1:20128 (dashboard /dashboard, API /v1)"
 
 # Setup OpenSSH Server
 echo

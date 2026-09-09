@@ -201,6 +201,7 @@
         .assistant-suggestions { position: absolute; left: 0; right: 76px; bottom: calc(100% + 6px); display: none; max-height: 180px; overflow-y: auto; background: var(--panel-strong); border: 1px solid var(--border-light); border-radius: 7px; box-shadow: var(--shadow); z-index: 5; }
         .assistant-suggestion { padding: 8px 10px; color: var(--text-secondary); font-family: var(--mono); font-size: 11px; cursor: pointer; }
         .assistant-suggestion:hover { color: var(--text); background: rgba(255,255,255,.06); }
+        .assistant-provider-field { min-width: 180px; flex: 1; }
     </style>
 </head>
 <body>
@@ -423,8 +424,13 @@
                             <option value="groq">Groq</option>
                             <option value="github_copilot">GitHub Copilot</option>
                             <option value="telegram">Hermes Telegram</option>
+                            <option value="ninerouter">9Router (local)</option>
+                            <option value="custom">Custom OpenAI-Compatible</option>
                         </select>
-                        <input id="assistant-provider-value" class="log-search" type="password" placeholder="Provider key or token">
+                        <input id="assistant-provider-base-url" class="log-search assistant-provider-field" type="url" placeholder="Base URL, e.g. https://router.example/v1">
+                        <input id="assistant-provider-value" class="log-search assistant-provider-field" type="password" placeholder="Provider key or token">
+                        <input id="assistant-provider-model" class="log-search assistant-provider-field" type="text" placeholder="Model ID">
+                        <button class="btn" onclick="fetchAssistantModels()">↻ Fetch Models</button>
                         <button class="btn btn-start" onclick="saveAssistantProvider()">Save & Restart Hermes</button>
                         <span id="assistant-provider-status" class="log-meta"></span>
                     </div>
@@ -652,9 +658,53 @@
         panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
     }
 
+    function updateProviderFields() {
+        const provider = document.getElementById('assistant-provider').value;
+        const custom = provider === 'custom' || provider === 'ninerouter';
+        const baseUrl = document.getElementById('assistant-provider-base-url');
+        baseUrl.style.display = custom ? 'block' : 'none';
+        baseUrl.required = custom;
+        if (provider === 'ninerouter') {
+            baseUrl.value = 'http://127.0.0.1:20128/v1';
+        }
+    }
+
+    async function fetchAssistantModels() {
+        const status = document.getElementById('assistant-provider-status');
+        const baseUrl = document.getElementById('assistant-provider-base-url').value.trim();
+        const apiKey = document.getElementById('assistant-provider-value').value.trim();
+        if (!baseUrl) return showToast('Enter a provider base URL first.', 'error');
+        status.innerText = 'Connecting to provider...';
+        try {
+            const res = await fetch('/api/assistant/models', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ base_url: baseUrl, api_key: apiKey })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Model discovery failed');
+            const modelInput = document.getElementById('assistant-provider-model');
+            modelInput.setAttribute('list', 'assistant-model-options');
+            let list = document.getElementById('assistant-model-options');
+            if (!list) {
+                list = document.createElement('datalist');
+                list.id = 'assistant-model-options';
+                document.body.appendChild(list);
+            }
+            list.innerHTML = data.models.map(model => `<option value="${model.replace(/"/g, '&quot;')}"></option>`).join('');
+            if (data.models.length === 1) modelInput.value = data.models[0];
+            status.innerText = `${data.models.length} models found`;
+        } catch (error) {
+            status.innerText = error.message;
+            showToast(error.message, 'error');
+        }
+    }
+
     async function saveAssistantProvider() {
         const provider = document.getElementById('assistant-provider').value;
+        const baseUrl = document.getElementById('assistant-provider-base-url').value.trim();
         const valueInput = document.getElementById('assistant-provider-value');
+        const model = document.getElementById('assistant-provider-model').value.trim();
         const status = document.getElementById('assistant-provider-status');
         const value = valueInput.value.trim();
         if (!value) return showToast('Enter a provider key or token.', 'error');
@@ -663,7 +713,7 @@
             const res = await fetch('/api/assistant/providers', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ provider, value })
+                body: JSON.stringify({ provider, value, model, base_url: baseUrl })
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Provider save failed');
@@ -703,13 +753,21 @@
         if (!content || assistantAbort) return;
         input.value = '';
         assistantMessages.push({ role: 'user', content });
-        const assistantMessage = { role: 'assistant', content: '' };
+        const assistantMessage = { role: 'assistant', content: 'Waking Hermes up...' };
         assistantMessages.push(assistantMessage);
         renderAssistantMessages();
         document.getElementById('assistant-stop').disabled = false;
-        document.getElementById('assistant-activity').innerText = 'Working...';
+        document.getElementById('assistant-activity').innerText = 'Message received';
         assistantAbort = new AbortController();
         assistantRequestId = crypto.randomUUID();
+        let responseStarted = false;
+        const statusTimer = setTimeout(() => {
+            if (!responseStarted) {
+                assistantMessage.content = 'Connecting to your provider...';
+                document.getElementById('assistant-activity').innerText = 'Provider connection in progress';
+                renderAssistantMessages();
+            }
+        }, 900);
         try {
             const res = await fetch('/api/assistant/chat', {
                 method: 'POST',
@@ -721,6 +779,9 @@
             const reader = res.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
+            assistantMessage.content = 'Hermes is thinking...';
+            document.getElementById('assistant-activity').innerText = 'Hermes is working';
+            renderAssistantMessages();
             while (true) {
                 const { value, done } = await reader.read();
                 if (done) break;
@@ -733,6 +794,11 @@
                     try {
                         const data = JSON.parse(line.slice(6));
                         const delta = data.choices?.[0]?.delta?.content || '';
+                        if (delta && !responseStarted) {
+                            responseStarted = true;
+                            assistantMessage.content = '';
+                            document.getElementById('assistant-activity').innerText = 'Writing response';
+                        }
                         assistantMessage.content += delta;
                         renderAssistantMessages();
                     } catch (e) { /* Ignore non-JSON stream metadata. */ }
@@ -745,6 +811,7 @@
                 renderAssistantMessages();
             }
         } finally {
+            clearTimeout(statusTimer);
             assistantAbort = null;
             assistantRequestId = '';
             document.getElementById('assistant-stop').disabled = true;
@@ -773,6 +840,8 @@
         if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendAssistantMessage(); }
         if (event.key === 'Escape') document.getElementById('assistant-suggestions').style.display = 'none';
     });
+    document.getElementById('assistant-provider').addEventListener('change', updateProviderFields);
+    updateProviderFields();
 
     async function controlBot(bot, action) {
         try {

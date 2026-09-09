@@ -37,6 +37,12 @@ repository/
   - File Explorer for browsing directory contents and viewing source files.
   - **Server Assistant** powered by Hermes Agent, with streamed chat, compact tool activity, Stop control, and curated command autocomplete.
   - Provider setup from the authenticated panel; provider credentials are stored in Hermes state and restored on redeploy.
+- **9Router local AI gateway**:
+  - Runs privately on `127.0.0.1:20128` using the official `decolua/9router:latest` Docker image.
+  - Dashboard: `http://127.0.0.1:20128/dashboard` through SSH/local access.
+  - OpenAI-compatible API: `http://127.0.0.1:20128/v1`.
+  - Persistent database and configuration are stored in `~/.9router` and restored through the `9router-state-*` Actions cache.
+  - Select **9Router (local)** in Server Assistant → Providers, enter the 9Router API key from its dashboard, fetch models, choose one, and save.
 - **Public SSH Access (Tailscale Funnel)**:
   - Exposes the VM's OpenSSH server (port 22) to the public internet via Tailscale Funnel.
   - Port priority: **443** → fallback **8443** → fallback **10000**.
@@ -98,6 +104,8 @@ Provider API keys are intentionally **not required during workflow setup**. Afte
 The value is written to the runner's `~/.hermes/.env` with restricted permissions. Hermes state, including configured providers, is saved to and restored from the `hermes-state-*` Actions cache during runner replacement. The API key used by the panel itself remains the separate `HERMES_API_SERVER_KEY` GitHub secret.
 
 Supported provider entries currently include OpenRouter, OpenAI, Anthropic, Google Gemini, xAI, DeepSeek, Groq, GitHub Copilot, and the Hermes Telegram bot token.
+
+9Router is a local OpenAI-compatible gateway rather than an Hermes provider credential. Configure its upstream providers and API key from the 9Router dashboard, then use the **9Router (local)** provider in the Hermes panel.
 
 ## Starting
 

@@ -6,6 +6,7 @@ BASE_DIR="$HOME/bot-server"
 BOT_DIR="$BASE_DIR/bots"
 PANEL_DIR="$BASE_DIR/panel"
 HERMES_HOME_DIR="$HOME/.hermes"
+NINEROUTER_HOME_DIR="$HOME/.9router"
 
 LOVE_WHISPERS_DIR="$BOT_DIR/love-whispers-bot"
 PACKTOGETHER_DIR="$BOT_DIR/PackTogether"
@@ -16,6 +17,8 @@ echo "======================================"
 
 mkdir -p "$BOT_DIR"
 mkdir -p "$PANEL_DIR"
+mkdir -p "$NINEROUTER_HOME_DIR"
+chmod 700 "$NINEROUTER_HOME_DIR"
 
 # The hosted runner may include Google's Chrome source, which can briefly serve
 # Packages metadata that does not match its Release file. Chrome is not a
@@ -34,6 +37,7 @@ sudo apt-get install -y \
     software-properties-common \
     build-essential \
     curl \
+    openssl \
     git \
     wget \
     jq \
@@ -86,6 +90,25 @@ mkdir -p "$HERMES_HOME_DIR"
 chmod 700 "$HERMES_HOME_DIR"
 
 echo
+echo "==> Preparing 9Router data directory"
+if [ ! -f "$NINEROUTER_HOME_DIR/.env" ]; then
+    cat > "$NINEROUTER_HOME_DIR/.env" <<EOF
+JWT_SECRET=$(openssl rand -hex 32)
+INITIAL_PASSWORD=$(openssl rand -base64 24)
+API_KEY_SECRET=$(openssl rand -hex 32)
+MACHINE_ID_SALT=$(openssl rand -hex 32)
+DATA_DIR=/app/data
+PORT=20128
+NODE_ENV=production
+BASE_URL=http://127.0.0.1:20128
+NEXT_PUBLIC_BASE_URL=http://127.0.0.1:20128
+REQUIRE_API_KEY=true
+ENABLE_REQUEST_LOGS=false
+EOF
+    chmod 600 "$NINEROUTER_HOME_DIR/.env"
+fi
+
+echo
 echo "==> Installing Python 3.12"
 
 sudo add-apt-repository -y ppa:deadsnakes/ppa
@@ -135,7 +158,7 @@ cd "$PANEL_DIR"
 python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-pip install flask psutil requests
+pip install flask psutil requests pyyaml
 deactivate
 
 echo

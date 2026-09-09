@@ -37,6 +37,14 @@ jobs:
           restore-keys: |
             hermes-state-
 
+      - name: Restore 9Router State
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/.9router
+          key: 9router-state-${{ github.run_id }}
+          restore-keys: |
+            9router-state-
+
       - name: Setup Environment
         env:
           SERVER_USERNAME: ${{ vars.SERVER_USERNAME || secrets.SERVER_USERNAME || 'admin' }}
@@ -102,6 +110,13 @@ jobs:
           path: /home/runner/.hermes
           key: hermes-state-${{ github.run_id }}
 
+      - name: Save 9Router State
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: /home/runner/.9router
+          key: 9router-state-${{ github.run_id }}
+
       - name: Upload Logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -114,6 +129,7 @@ jobs:
             /tmp/cloudflared.log
             /tmp/funnel_ssh.log
             /tmp/hermes.log
+            /tmp/9router.log
           if-no-files-found: warn
 
       - name: Trigger Next Workflow Run (if not redeploying)
