@@ -177,6 +177,12 @@ for PORT in 443 8443 10000; do
     fi
 done
 
+if [ -z "$FUNNEL_PORT" ]; then
+    echo "WARNING: Tailscale Funnel could not be configured for SSH."
+    echo "Funnel diagnostics:"
+    sed 's/TAILSCALE_AUTHKEY=.*/TAILSCALE_AUTHKEY=[redacted]/' /tmp/funnel_ssh.log 2>/dev/null || true
+fi
+
 # Persist Funnel configuration across reboots via systemd service
 if [ -n "$FUNNEL_PORT" ]; then
     cat <<EOF | sudo tee /etc/systemd/system/tailscale-funnel.service >/dev/null
@@ -207,12 +213,9 @@ tailscale funnel status 2>/dev/null || tailscale serve status 2>/dev/null || tru
 if [ -n "$TS_DOMAIN" ] && [ -n "$FUNNEL_PORT" ]; then
     SSH_CMD="ssh -p $FUNNEL_PORT $SSH_USER@$TS_DOMAIN"
     echo "$SSH_CMD" > /tmp/ssh_cmd.txt
-elif [ -n "$TS_DOMAIN" ]; then
-    TS_IP=$(tailscale ip -4 2>/dev/null || echo "127.0.0.1")
-    SSH_CMD="ssh $SSH_USER@$TS_IP"
-    echo "$SSH_CMD" > /tmp/ssh_cmd.txt
 else
-    echo "ssh $SSH_USER@localhost" > /tmp/ssh_cmd.txt
+    SSH_CMD="SSH unavailable: Tailscale Funnel is not active"
+    echo "$SSH_CMD" > /tmp/ssh_cmd.txt
 fi
 
 echo
