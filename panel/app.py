@@ -167,15 +167,19 @@ def write_hermes_model(provider, model, base_url=None):
 
 def restart_hermes():
     pid_path = "/tmp/hermes.pid"
+    old_pid = None
     if os.path.isfile(pid_path):
         try:
             with open(pid_path, "r") as pid_file:
-                pid = int(pid_file.read().strip())
-            os.kill(pid, signal.SIGTERM)
-            for _ in range(20):
-                if not psutil.pid_exists(pid):
+                old_pid = int(pid_file.read().strip())
+            os.kill(old_pid, signal.SIGTERM)
+            for _ in range(40):
+                if not psutil.pid_exists(old_pid):
                     break
                 time.sleep(0.25)
+            if psutil.pid_exists(old_pid):
+                os.kill(old_pid, signal.SIGKILL)
+                time.sleep(0.5)
         except (OSError, ValueError):
             pass
 
@@ -196,6 +200,15 @@ def restart_hermes():
     )
     with open(pid_path, "w") as pid_file:
         pid_file.write(str(process.pid))
+    for _ in range(30):
+        try:
+            response = requests.get(f"{HERMES_API_URL}/health", timeout=1)
+            if response.ok:
+                return
+        except requests.RequestException:
+            pass
+        time.sleep(1)
+    raise RuntimeError("Hermes did not become ready after restart")
 
 def login_required(f):
     @wraps(f)
@@ -599,7 +612,7 @@ def assistant_chat():
             headers={**hermes_headers(), "Content-Type": "application/json"},
             json=upstream_payload,
             stream=True,
-            timeout=(5, 1800)
+            timeout=(5, 90)
         )
     except requests.RequestException:
         return jsonify({"error": "Hermes request failed"}), 502
