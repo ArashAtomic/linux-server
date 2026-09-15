@@ -207,25 +207,34 @@ echo "Management Panel PID: $PANEL_PID (Port 8080)"
 echo
 echo "==> Starting Cloudflare Tunnel for Web Panel"
 rm -f /tmp/cloudflared.url /tmp/panel_url.txt /tmp/ssh_cmd.txt
-nohup cloudflared tunnel --url http://localhost:8080 > /tmp/cloudflared.log 2>&1 &
-CF_PID=$!
-echo "$CF_PID" > /tmp/cloudflared.pid
+rm -f /tmp/cloudflared.log
 
-echo "Waiting for Cloudflare Panel URL..."
-for i in {1..45}; do
-    if [ ! -s /tmp/cloudflared.url ]; then
-        grep -Eo 'https://[-a-zA-Z0-9.]+\.trycloudflare\.com/?' /tmp/cloudflared.log \
-            | grep -Ev '^https://api\.trycloudflare\.com/?$' \
-            | head -n 1 > /tmp/cloudflared.url || true
-    fi
-    if [ -s /tmp/cloudflared.url ]; then
-        break
-    fi
-    if ! kill -0 "$CF_PID" 2>/dev/null; then
-        echo "WARNING: cloudflared exited before publishing a Quick Tunnel URL."
-        break
-    fi
-    sleep 1
+CF_PID=""
+for attempt in 1 2 3; do
+    echo "Starting Cloudflare Quick Tunnel (attempt $attempt/3)..."
+    nohup cloudflared tunnel --edge-ip-version 4 --protocol http2 \
+        --url http://127.0.0.1:8080 >> /tmp/cloudflared.log 2>&1 &
+    CF_PID=$!
+    echo "$CF_PID" > /tmp/cloudflared.pid
+
+    echo "Waiting for Cloudflare Panel URL..."
+    for i in {1..45}; do
+        if [ ! -s /tmp/cloudflared.url ]; then
+            grep -Eo 'https://[-a-zA-Z0-9]+\.trycloudflare\.com/?' /tmp/cloudflared.log \
+                | grep -Ev '^https://api\.trycloudflare\.com/?$' \
+                | head -n 1 > /tmp/cloudflared.url || true
+        fi
+        if [ -s /tmp/cloudflared.url ]; then
+            break 2
+        fi
+        if ! kill -0 "$CF_PID" 2>/dev/null; then
+            echo "Cloudflared exited before publishing a URL on attempt $attempt."
+            break
+        fi
+        sleep 1
+    done
+    kill "$CF_PID" 2>/dev/null || true
+    sleep 2
 done
 
 if [ -s /tmp/cloudflared.url ]; then
