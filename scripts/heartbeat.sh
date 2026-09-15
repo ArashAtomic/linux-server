@@ -70,7 +70,7 @@ if [ -s /tmp/ssh_cmd.txt ]; then
     SSH_CMD=$(cat /tmp/ssh_cmd.txt)
 fi
 
-NOW=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+NOW=$(TZ='Asia/Tehran' date '+%Y-%m-%d %H:%M:%S Tehran')
 STATUS_LOVE=$(bot_status_plain "❤️ Love Whispers" "/tmp/love-whispers.pid")
 STATUS_PACK=$(bot_status_plain "🎒 PackTogether" "/tmp/packtogether.pid")
 CPU_INFO=$(get_cpu)
@@ -81,7 +81,7 @@ TELEGRAM_MSG="<b>🚀 BOT SERVER IS ONLINE</b>
 <b>🌐 Web Control Panel</b>
 <a href=\"${PANEL_URL}\">${PANEL_URL}</a>
 
-<b>💻 SSH Terminal Access (private Tailscale network)</b>
+<b>💻 SSH Terminal Access</b>
 <code>${SSH_CMD}</code>
 
 <b>🤖 Bot Status</b>
