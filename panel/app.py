@@ -42,6 +42,19 @@ HERMES_PROVIDER_KEYS = {
 ACTIVE_HERMES_REQUESTS = {}
 ACTIVE_HERMES_REQUESTS_LOCK = Lock()
 
+def get_hermes_model():
+    try:
+        config_path = os.path.join(HERMES_HOME, "config.yaml")
+        with open(config_path, "r") as config_file:
+            config = yaml.safe_load(config_file) or {}
+        model_config = config.get("model", {})
+        selected_model = model_config.get("default") or model_config.get("model")
+        if isinstance(selected_model, str) and selected_model.strip():
+            return selected_model.strip()
+    except (OSError, yaml.YAMLError):
+        pass
+    return HERMES_MODEL
+
 BOTS = {
     "love-whispers": {
         "name": "Love Whispers",
@@ -476,7 +489,7 @@ def assistant_health():
         )
         if not response.ok:
             return jsonify({"available": False, "error": "Hermes health check failed"}), 503
-        return jsonify({"available": True, "model": HERMES_MODEL})
+        return jsonify({"available": True, "model": get_hermes_model()})
     except requests.RequestException:
         return jsonify({"available": False, "error": "Hermes is unavailable"}), 503
 
@@ -572,7 +585,7 @@ def assistant_chat():
         messages.append({"role": role, "content": content})
 
     upstream_payload = {
-        "model": HERMES_MODEL,
+        "model": get_hermes_model(),
         "messages": messages,
         "stream": True
     }
