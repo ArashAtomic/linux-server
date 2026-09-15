@@ -60,7 +60,7 @@ for i in {1..10}; do
     sleep 1
 done
 
-PANEL_URL="http://localhost:8080"
+PANEL_URL="Cloudflare URL unavailable"
 if [ -s /tmp/panel_url.txt ]; then
     PANEL_URL=$(cat /tmp/panel_url.txt)
 fi
@@ -70,7 +70,6 @@ if [ -s /tmp/ssh_cmd.txt ]; then
     SSH_CMD=$(cat /tmp/ssh_cmd.txt)
 fi
 
-USER_NAME="${SERVER_USERNAME:-admin}"
 NOW=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
 STATUS_LOVE=$(bot_status_plain "❤️ Love Whispers" "/tmp/love-whispers.pid")
 STATUS_PACK=$(bot_status_plain "🎒 PackTogether" "/tmp/packtogether.pid")
@@ -81,7 +80,6 @@ TELEGRAM_MSG="<b>🚀 BOT SERVER IS ONLINE</b>
 
 <b>🌐 Web Control Panel</b>
 <a href=\"${PANEL_URL}\">${PANEL_URL}</a>
-<i>Username:</i> <code>${USER_NAME}</code>
 
 <b>💻 SSH Terminal Access (private Tailscale network)</b>
 <code>${SSH_CMD}</code>
@@ -99,7 +97,6 @@ PLAIN_MSG="==================================================
   🚀 BOT SERVER IS ONLINE
   🌐 Web Control Panel   : ${PANEL_URL}
   💻 SSH Terminal Access : ${SSH_CMD}
-  👤 Username            : ${USER_NAME}
   ------------------------------------------------
   🤖 Bot Status:
     ${STATUS_LOVE}

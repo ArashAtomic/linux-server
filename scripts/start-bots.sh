@@ -212,9 +212,9 @@ CF_PID=$!
 echo "$CF_PID" > /tmp/cloudflared.pid
 
 echo "Waiting for Cloudflare Panel URL..."
-for i in {1..15}; do
+for i in {1..45}; do
     if [ ! -s /tmp/cloudflared.url ]; then
-        grep -o 'https://[-a-zA-Z0-9.]*\.trycloudflare\.com' /tmp/cloudflared.log | head -n 1 > /tmp/cloudflared.url || true
+        grep -Eo 'https://[-a-zA-Z0-9.]+\.trycloudflare\.com/?' /tmp/cloudflared.log | head -n 1 > /tmp/cloudflared.url || true
     fi
     if [ -s /tmp/cloudflared.url ]; then
         break
@@ -226,7 +226,7 @@ if [ -s /tmp/cloudflared.url ]; then
     cp /tmp/cloudflared.url /tmp/panel_url.txt
 else
     echo "WARNING: Cloudflare Tunnel URL was not discovered."
-    echo "http://localhost:8080" > /tmp/panel_url.txt
+    echo "Cloudflare URL unavailable; inspect /tmp/cloudflared.log" > /tmp/panel_url.txt
 fi
 
 # Connect Tailscale for private SSH access over the tailnet
