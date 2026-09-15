@@ -357,6 +357,8 @@
                         <option value="love-whispers">Love Whispers</option>
                         <option value="packtogether">PackTogether</option>
                         <option value="panel">Management Panel</option>
+                        <option value="hermes">Hermes Gateway</option>
+                        <option value="9router">9Router</option>
                     </select>
                 </div>
             </div>
@@ -803,6 +805,11 @@
                         renderAssistantMessages();
                     } catch (e) { /* Ignore non-JSON stream metadata. */ }
                 }
+            }
+            if (!responseStarted && !assistantMessage.content.startsWith('Assistant error')) {
+                assistantMessage.content = 'Hermes returned no response. Check Logs → Hermes Gateway.';
+                document.getElementById('assistant-activity').innerText = 'No response received';
+                renderAssistantMessages();
             }
             document.getElementById('assistant-activity').innerText = '';
         } catch (e) {

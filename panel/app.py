@@ -666,10 +666,15 @@ def redeploy_server():
 @app.route("/api/logs/<bot_key>")
 @login_required
 def get_logs(bot_key):
-    if bot_key not in BOTS and bot_key != "panel":
+    if bot_key not in BOTS and bot_key not in ["panel", "hermes", "9router"]:
         return jsonify({"error": "Unknown log target"}), 404
     
-    log_path = "/tmp/panel.log" if bot_key == "panel" else BOTS[bot_key]["log_path"]
+    log_paths = {
+        "panel": "/tmp/panel.log",
+        "hermes": "/tmp/hermes.log",
+        "9router": "/tmp/9router.log"
+    }
+    log_path = log_paths.get(bot_key, BOTS[bot_key]["log_path"])
     lines = int(request.args.get("lines", 200))
     
     if os.path.exists(log_path):
