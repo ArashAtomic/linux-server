@@ -106,6 +106,24 @@ if [ "$HERMES_READY" != "true" ]; then
 fi
 echo "Hermes Agent PID: $HERMES_PID (API 127.0.0.1:8642)"
 
+# Dedicated Hermes Telegram bridge. The heartbeat bot remains owned by the panel.
+echo
+echo "==> Starting Hermes Telegram bridge"
+if [ -z "${HERMES_TELEGRAM_BOT_TOKEN:-}" ]; then
+    echo "ERROR: HERMES_TELEGRAM_BOT_TOKEN is not configured."
+    exit 1
+fi
+cd "$PANEL_DIR"
+source .venv/bin/activate
+nohup env HERMES_HOME="$HERMES_HOME" HERMES_API_URL="http://127.0.0.1:8642" \
+    HERMES_API_SERVER_KEY="$API_SERVER_KEY" STATUS_CHAT_ID="${STATUS_CHAT_ID:-}" \
+    HERMES_TELEGRAM_BOT_TOKEN="$HERMES_TELEGRAM_BOT_TOKEN" \
+    python -u hermes_telegram.py > /tmp/hermes-telegram.log 2>&1 &
+HERMES_TELEGRAM_PID=$!
+echo "$HERMES_TELEGRAM_PID" > /tmp/hermes-telegram.pid
+deactivate
+echo "Hermes Telegram bridge PID: $HERMES_TELEGRAM_PID"
+
 # 9Router OpenAI-compatible gateway
 echo
 echo "==> Starting 9Router"

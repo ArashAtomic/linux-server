@@ -214,7 +214,7 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not session.get("logged_in"):
-            if request.path.startswith("/api/"):
+            if request.path.startswith("/api/") or request.accept_mimetypes.best == "application/json":
                 return jsonify({"error": "Unauthorized"}), 401
             return redirect(url_for("login"))
         return f(*args, **kwargs)

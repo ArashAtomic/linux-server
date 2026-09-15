@@ -57,6 +57,11 @@ repository/
   - `📊 /status` - Real-time CPU/RAM stats and bot health.
   - `🌐 /panel` - Direct link to the Web Management Panel.
   - `💻 /ssh` - The exact private Tailscale SSH command.
+- **Hermes Telegram Control**:
+  - Uses a separate bot token so the heartbeat bot and Hermes never compete for Telegram updates.
+  - Restricts access to `STATUS_CHAT_ID` and persists the update offset and chat sessions in Hermes state.
+  - Supports `/sessions`, `/resume`, `/new`, `/reset`, `/models`, `/model`, `/status`, and normal Hermes chat.
+  - Dangerous tool approvals, provider mutation, and advanced tool controls remain disabled until the installed Hermes control API is verified and the approval adapter is enabled.
 - **Continuous 24/7 Uptime**:
   - 5-hour and 45-minute runner cycle with automated handoff triggering the next GitHub Actions workflow.
 
@@ -90,6 +95,7 @@ When the workflow boots:
 | `PACKTOGETHER_ENV` | Complete `.env` content for PackTogether | None |
 | `STATUS_BOT_TOKEN` | Telegram bot token for status notifications & commands | None |
 | `STATUS_CHAT_ID` | Telegram chat ID for notifications & commands | None |
+| `HERMES_TELEGRAM_BOT_TOKEN` | Separate Telegram bot token used by the Hermes bridge | Required for Hermes Telegram control |
 | `HERMES_API_SERVER_KEY` | Strong bearer key used internally between the panel and Hermes | Required |
 
 ### Hermes Provider Setup
@@ -103,6 +109,8 @@ Provider API keys are intentionally **not required during workflow setup**. Afte
 The value is written to the runner's `~/.hermes/.env` with restricted permissions. Hermes state, including configured providers, is saved to and restored from the `hermes-state-*` Actions cache during runner replacement. The API key used by the panel itself remains the separate `HERMES_API_SERVER_KEY` GitHub secret.
 
 Supported provider entries currently include OpenRouter, OpenAI, Anthropic, Google Gemini, xAI, DeepSeek, Groq, GitHub Copilot, and the Hermes Telegram bot token.
+
+The Hermes Telegram bridge token is a transport credential, not an AI provider credential. Create a separate Telegram bot with BotFather and store its token as `HERMES_TELEGRAM_BOT_TOKEN`. Do not reuse `STATUS_BOT_TOKEN`. The bridge currently accepts messages only from `STATUS_CHAT_ID`; other chats are ignored.
 
 9Router is a local OpenAI-compatible gateway rather than an Hermes provider credential. Configure its upstream providers and API key from the 9Router dashboard, then use the **9Router (local)** provider in the Hermes panel.
 
