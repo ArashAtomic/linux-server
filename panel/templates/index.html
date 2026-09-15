@@ -367,6 +367,7 @@
             <div id="tab-logs">
                 <div class="console-toolbar">
                     <div class="live-indicator"><span></span>LIVE</div>
+                    <div id="log-target" class="log-meta">Love Whispers</div>
                     <input id="log-search" class="log-search" type="search" placeholder="Filter logs…" oninput="filterLogs()">
                     <div id="log-count" class="log-meta">0 lines</div>
                     <button class="btn" id="pause-logs" onclick="togglePause()">⏸ Pause</button>
@@ -516,13 +517,21 @@
     async function fetchLogs() {
         if (currentTab !== 'logs' || paused) return;
         const bot = document.getElementById('bot-select').value;
+        const targetName = document.getElementById('bot-select').selectedOptions[0]?.text || bot;
+        document.getElementById('log-target').innerText = targetName;
         try {
-            const res = await fetch(`/api/logs/${bot}`);
+            const res = await fetch(`/api/logs/${encodeURIComponent(bot)}?lines=200&_=${Date.now()}`, { cache: 'no-store' });
             const data = await res.json();
+            if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
             rawLogs = data.logs || '';
             document.getElementById('log-count').innerText = `${data.total_lines || 0} lines`;
             filterLogs();
-        } catch (e) { console.error("Log error", e); }
+        } catch (e) {
+            rawLogs = `Unable to load ${targetName} logs: ${e.message}`;
+            document.getElementById('log-count').innerText = 'error';
+            filterLogs();
+            console.error("Log error", e);
+        }
     }
 
     function filterLogs() {
