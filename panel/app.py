@@ -541,7 +541,7 @@ def configure_assistant_provider():
     try:
         write_hermes_env(values)
         if model:
-            write_hermes_model("custom", model, base_url if provider in ["custom", "ninerouter"] else None)
+            write_hermes_model(provider, model, base_url if provider in ["custom", "ninerouter"] else None)
             global HERMES_MODEL
             HERMES_MODEL = model
         restart_hermes()

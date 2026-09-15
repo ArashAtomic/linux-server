@@ -112,6 +112,17 @@ Supported provider entries currently include OpenRouter, OpenAI, Anthropic, Goog
 
 The Hermes Telegram bridge token is a transport credential, not an AI provider credential. Create a separate Telegram bot with BotFather and store its token as `HERMES_TELEGRAM_BOT_TOKEN`. Do not reuse `STATUS_BOT_TOKEN`. The bridge currently accepts messages only from `STATUS_CHAT_ID`; other chats are ignored.
 
+Hermes Telegram provider commands currently include:
+
+```text
+/provider
+/provider set custom https://api.example.com/v1 model-id API_KEY
+/models https://api.example.com/v1 API_KEY
+/model model-id
+```
+
+Credential-bearing messages are deleted on a best-effort basis after processing. Using the authenticated web panel is preferred for long-lived provider keys. A provider HTTP 401 means the upstream endpoint rejected the provider credential; verify the exact base URL, required authentication format, account/model access, and that the key was saved under the provider selected in Hermes. `HERMES_API_SERVER_KEY` is unrelated to upstream provider authentication.
+
 9Router is a local OpenAI-compatible gateway rather than an Hermes provider credential. Configure its upstream providers and API key from the 9Router dashboard, then use the **9Router (local)** provider in the Hermes panel.
 
 ## Starting

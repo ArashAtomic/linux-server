@@ -4,11 +4,14 @@
 import json
 import os
 import signal
+import shutil
+import subprocess
 import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
 from threading import Lock
+from urllib.parse import urlparse
 
 import requests
 
@@ -23,6 +26,18 @@ PID_PATH = Path(os.environ.get("HERMES_TELEGRAM_PID", "/tmp/hermes-telegram.pid"
 MAX_MESSAGE_LENGTH = 3900
 MAX_HISTORY = 40
 POLL_TIMEOUT = 25
+PROVIDER_KEYS = {
+    "openrouter": "OPENROUTER_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
+    "google": "GOOGLE_API_KEY",
+    "xai": "XAI_API_KEY",
+    "deepseek": "DEEPSEEK_API_KEY",
+    "groq": "GROQ_API_KEY",
+    "github_copilot": "COPILOT_GITHUB_TOKEN",
+    "custom": "OPENAI_API_KEY",
+    "ninerouter": "OPENAI_API_KEY",
+}
 
 state_lock = Lock()
 stop_requested = False
@@ -75,8 +90,87 @@ def send_message(chat_id, text, reply_markup=None):
         telegram_call("sendMessage", values)
 
 
+def delete_message(chat_id, message_id):
+    try:
+        telegram_call("deleteMessage", {"chat_id": chat_id, "message_id": message_id}, timeout=10)
+    except Exception as error:
+        print(f"Could not delete credential message: {error}", flush=True)
+
+
 def hermes_headers():
     return {"Authorization": f"Bearer {HERMES_API_KEY}", "Accept": "application/json"}
+
+
+def read_provider_env():
+    values = {}
+    env_path = HERMES_HOME / ".env"
+    try:
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            if line.strip() and not line.lstrip().startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
+                values[key.strip()] = value.strip()
+    except OSError:
+        pass
+    return values
+
+
+def write_provider_env(values):
+    HERMES_HOME.mkdir(mode=0o700, parents=True, exist_ok=True)
+    env_path = HERMES_HOME / ".env"
+    temporary_path = env_path.with_suffix(".tmp")
+    temporary_path.write_text("".join(f"{key}={value}\n" for key, value in sorted(values.items())), encoding="utf-8")
+    os.chmod(temporary_path, 0o600)
+    temporary_path.replace(env_path)
+
+
+def valid_provider_url(value):
+    parsed = urlparse(value)
+    return parsed.scheme in ("http", "https") and bool(parsed.netloc) and len(value) <= 500
+
+
+def restart_gateway():
+    pid_path = Path("/tmp/hermes.pid")
+    if pid_path.is_file():
+        try:
+            old_pid = int(pid_path.read_text(encoding="utf-8").strip())
+            os.kill(old_pid, signal.SIGTERM)
+            for _ in range(40):
+                if not Path(f"/proc/{old_pid}").exists():
+                    break
+                time.sleep(0.25)
+        except (OSError, ValueError):
+            pass
+
+    hermes_command = shutil.which("hermes") or str(Path.home() / ".local/bin/hermes")
+    environment = {
+        "PATH": os.environ.get("PATH", ""),
+        "HOME": os.environ.get("HOME", str(Path.home())),
+        "HERMES_HOME": str(HERMES_HOME),
+        "API_SERVER_ENABLED": "true",
+        "API_SERVER_HOST": "127.0.0.1",
+        "API_SERVER_PORT": "8642",
+        "API_SERVER_KEY": HERMES_API_KEY,
+    }
+    log_file = open("/tmp/hermes.log", "a", encoding="utf-8")
+    process = subprocess.Popen(
+        [hermes_command, "gateway"],
+        stdout=log_file,
+        stderr=subprocess.STDOUT,
+        env=environment,
+        start_new_session=True,
+    )
+    pid_path.write_text(str(process.pid), encoding="utf-8")
+    for _ in range(30):
+        try:
+            response = requests.get(f"{HERMES_API_URL}/health", headers=hermes_headers(), timeout=1)
+            if response.ok:
+                log_file.close()
+                return
+        except requests.RequestException:
+            pass
+        time.sleep(1)
+    log_file.close()
+    raise RuntimeError("Hermes did not become ready after provider restart")
 
 
 def configured_model():
@@ -128,7 +222,7 @@ def chat_with_hermes(session):
     return content.strip() or "Hermes returned an empty response."
 
 
-def write_model(model):
+def write_model(provider, model, base_url=""):
     import yaml
 
     config_path = HERMES_HOME / "config.yaml"
@@ -136,7 +230,13 @@ def write_model(model):
     if config_path.is_file():
         with config_path.open("r", encoding="utf-8") as config_file:
             config = yaml.safe_load(config_file) or {}
-    config.setdefault("model", {})["default"] = model
+    model_config = config.setdefault("model", {})
+    model_config["provider"] = provider
+    model_config["default"] = model
+    if base_url:
+        model_config["base_url"] = base_url.rstrip("/")
+    elif provider not in ("custom", "ninerouter"):
+        model_config.pop("base_url", None)
     temporary_path = config_path.with_suffix(".tmp")
     with temporary_path.open("w", encoding="utf-8") as config_file:
         yaml.safe_dump(config, config_file, sort_keys=False)
@@ -157,6 +257,7 @@ def handle_command(chat_id, text):
                 "/reset - clear the selected session\n"
                 "/models - list gateway models\n"
                 "/model <id> - select a model\n"
+                "/provider - show provider commands\n"
                 "/status - Hermes and server status\n"
                 "/redeploy - request a fresh runner\n\n"
                 "Dangerous tool actions require explicit approval. The approval adapter is being enabled next.")
@@ -191,6 +292,25 @@ def handle_command(chat_id, text):
         return "Selected session history cleared."
 
     if command == "/models":
+        if argument:
+            parts = argument.split()
+            base_url = parts[0].rstrip("/")
+            api_key = parts[1] if len(parts) > 1 else ""
+            if not valid_provider_url(base_url):
+                return "Usage: /models <https://provider.example/v1> [api-key]"
+            try:
+                response = requests.get(
+                    f"{base_url}/models",
+                    headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
+                    timeout=15,
+                )
+                if not response.ok:
+                    return f"Provider returned HTTP {response.status_code}: {response.text[:300]}"
+                models = [item.get("id") for item in response.json().get("data", [])
+                          if isinstance(item, dict) and item.get("id")]
+                return "Available provider models:\n" + "\n".join(models[:100]) if models else "Provider returned no models."
+            except (requests.RequestException, ValueError) as error:
+                return f"Could not fetch provider models: {error}"
         response = requests.get(f"{HERMES_API_URL}/v1/models", headers=hermes_headers(), timeout=15)
         if not response.ok:
             return f"Hermes model endpoint returned HTTP {response.status_code}."
@@ -201,7 +321,13 @@ def handle_command(chat_id, text):
         if not argument or len(argument) > 300 or any(char in argument for char in "\r\n"):
             return f"Current model: `{configured_model()}`\nUse /model <model-id> to change it."
         try:
-            write_model(argument)
+            current_provider = "custom"
+            config_path = HERMES_HOME / "config.yaml"
+            if config_path.is_file():
+                import yaml
+                with config_path.open("r", encoding="utf-8") as config_file:
+                    current_provider = (yaml.safe_load(config_file) or {}).get("model", {}).get("provider", "custom")
+            write_model(current_provider, argument)
             return f"Selected model `{argument}`."
         except (OSError, ValueError, ImportError) as error:
             return f"Could not save model: {error}"
@@ -213,7 +339,37 @@ def handle_command(chat_id, text):
         except requests.RequestException:
             return "Hermes: unavailable"
 
-    if command in ("/redeploy", "/tools", "/skills", "/provider", "/approve", "/deny", "/allowlist", "/bg", "/compress", "/sethome", "/stop"):
+    if command == "/provider":
+        if not argument or argument.lower() in ("help", "list"):
+            configured = [name for name, env_key in PROVIDER_KEYS.items() if read_provider_env().get(env_key)]
+            return ("Configured providers: " + (", ".join(configured) or "none") +
+                    "\n\nSet a provider (the key is deleted from this Telegram message when possible):\n"
+                    "/provider set <name> <base-url-or-> <model> <api-key>\n"
+                    "Fetch models:\n/models <base-url> [api-key]")
+        parts = argument.split(maxsplit=4)
+        if len(parts) != 5 or parts[0].lower() != "set":
+            return "Usage: /provider set <name> <base-url-or-> <model> <api-key>"
+        provider, base_url, model, value = parts[1:]
+        provider = provider.lower()
+        if provider not in PROVIDER_KEYS:
+            return "Unsupported provider. Use /provider to see configured providers."
+        if base_url == "-":
+            base_url = ""
+        if provider in ("custom", "ninerouter") and not valid_provider_url(base_url):
+            return "Custom and 9Router providers require a valid base URL."
+        if any(len(item) > 5000 or "\n" in item or "\r" in item for item in (model, value)):
+            return "Model or provider key is invalid."
+        try:
+            values = read_provider_env()
+            values[PROVIDER_KEYS[provider]] = value
+            write_provider_env(values)
+            write_model(provider, model, base_url)
+            restart_gateway()
+            return f"Provider `{provider}` and model `{model}` saved; Hermes restarted."
+        except (OSError, ValueError, RuntimeError, requests.RequestException) as error:
+            return f"Provider save failed: {error}"
+
+    if command in ("/redeploy", "/tools", "/skills", "/approve", "/deny", "/allowlist", "/bg", "/compress", "/sethome", "/stop"):
         return "This control is reserved for the Hermes adapter phase and is not enabled yet. No action was taken."
 
     return None
@@ -226,9 +382,15 @@ def handle_update(update):
     if not chat_id or chat_id != ALLOWED_CHAT_ID or not text:
         return
 
+    contains_credential = text.lower().startswith("/provider set ") or (
+        text.lower().startswith("/models ") and len(text.split()) > 2
+    )
+
     command_response = handle_command(chat_id, text) if text.startswith("/") else None
     if command_response is not None:
         send_message(chat_id, command_response)
+        if contains_credential:
+            delete_message(chat_id, message.get("message_id"))
         return
 
     session_id, selected = active_session(chat_id)
@@ -246,6 +408,8 @@ def handle_update(update):
         selected["messages"].append({"role": "assistant", "content": response})
         save_state()
     send_message(chat_id, response)
+    if contains_credential:
+        delete_message(chat_id, message.get("message_id"))
 
 
 def signal_handler(_signum, _frame):
