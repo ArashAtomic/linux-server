@@ -123,6 +123,12 @@ HERMES_TELEGRAM_PID=$!
 echo "$HERMES_TELEGRAM_PID" > /tmp/hermes-telegram.pid
 deactivate
 echo "Hermes Telegram bridge PID: $HERMES_TELEGRAM_PID"
+sleep 2
+if ! kill -0 "$HERMES_TELEGRAM_PID" 2>/dev/null; then
+    echo "ERROR: Hermes Telegram bridge exited during startup."
+    tail -n 40 /tmp/hermes-telegram.log || true
+    exit 1
+fi
 
 # 9Router OpenAI-compatible gateway
 echo

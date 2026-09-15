@@ -256,6 +256,12 @@ def signal_handler(_signum, _frame):
 def main():
     if not BOT_TOKEN or not ALLOWED_CHAT_ID or not HERMES_API_KEY:
         raise SystemExit("HERMES_TELEGRAM_BOT_TOKEN, STATUS_CHAT_ID, and HERMES_API_SERVER_KEY are required")
+    me = telegram_call("getMe", timeout=10)
+    print(f"Hermes Telegram bridge authenticated as @{me.get('username', 'unknown')}", flush=True)
+    health = requests.get(f"{HERMES_API_URL}/health", headers=hermes_headers(), timeout=5)
+    if not health.ok:
+        raise SystemExit(f"Hermes gateway health check failed with HTTP {health.status_code}")
+    print(f"Hermes Telegram bridge is ready for chat {ALLOWED_CHAT_ID}", flush=True)
     PID_PATH.write_text(str(os.getpid()), encoding="utf-8")
     signal.signal(signal.SIGTERM, signal_handler)
     signal.signal(signal.SIGINT, signal_handler)

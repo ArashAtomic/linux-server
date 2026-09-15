@@ -672,10 +672,14 @@ def get_logs(bot_key):
     log_paths = {
         "panel": "/tmp/panel.log",
         "hermes": "/tmp/hermes.log",
+        "hermes-telegram": "/tmp/hermes-telegram.log",
         "9router": "/tmp/9router.log"
     }
-    log_path = log_paths.get(bot_key, BOTS[bot_key]["log_path"])
-    lines = int(request.args.get("lines", 200))
+    log_path = log_paths[bot_key] if bot_key in log_paths else BOTS[bot_key]["log_path"]
+    try:
+        lines = max(1, min(int(request.args.get("lines", 200)), 1000))
+    except ValueError:
+        return jsonify({"error": "Invalid lines value"}), 400
     
     if os.path.exists(log_path):
         try:
