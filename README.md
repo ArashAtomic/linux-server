@@ -48,7 +48,7 @@ repository/
   - Exposes the VM's OpenSSH server on port 22 only through its Tailscale address.
   - Requires Tailscale to be installed and logged into the same tailnet on the client:
     ```bash
-    ssh <SERVER_USERNAME>@<machine>.<tailnet>.ts.net
+    ssh <SERVER_USERNAME>@<tailscale-ip>
     ```
   - Prompts for your `SERVER_PASSWORD` in the terminal before granting shell access.
 - **Interactive Telegram Bot Commands**:

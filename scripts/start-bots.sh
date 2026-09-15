@@ -276,8 +276,8 @@ echo "==> Tailscale Status:"
 tailscale status || true
 
 # Construct private tailnet SSH command & Panel URL
-if [ -n "$TS_DOMAIN" ]; then
-    SSH_CMD="ssh $SSH_USER@$TS_DOMAIN"
+if [ -n "$TS_IP" ]; then
+    SSH_CMD="ssh $SSH_USER@$TS_IP"
     echo "$SSH_CMD" > /tmp/ssh_cmd.txt
 else
     SSH_CMD="SSH unavailable: Tailscale is not connected"

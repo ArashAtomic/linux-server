@@ -237,7 +237,7 @@ def get_ssh_cmd():
         except Exception:
             pass
     user = os.environ.get("SERVER_USERNAME", "admin")
-    return f"ssh {user}@bot-server.<tailnet>.ts.net"
+    return f"ssh {user}@100.x.x.x"
 
 def format_uptime(seconds):
     seconds = int(seconds)
