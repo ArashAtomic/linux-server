@@ -220,6 +220,14 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+try:
+    from .assistant import create_assistant_blueprint
+except ImportError:
+    from assistant import create_assistant_blueprint
+
+app.register_blueprint(create_assistant_blueprint(login_required))
+
+
 def get_bot_proc(bot_key):
     pid_path = BOTS[bot_key]["pid_path"]
     if os.path.exists(pid_path):
