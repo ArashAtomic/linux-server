@@ -23,7 +23,7 @@
             --accent-soft: rgba(56, 189, 248, .12);
 
             --green: #34d399;
-            --green-soft: rgba(52, 211, 153, .12);
+            --green-soft: rgba(52, 213, 153, .12);
 
             --yellow: #fbbf24;
             --yellow-soft: rgba(251, 191, 36, .12);
@@ -190,18 +190,60 @@
         .toast.success { border-color: rgba(52,211,153,.4); }
         .toast.error { border-color: rgba(251,113,133,.4); }
 
-        .assistant-chat { display: flex; flex-direction: column; gap: 12px; }
-        .assistant-messages { height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px; background: #04070d; border: 1px solid var(--border); border-radius: 8px; }
+        /* ASSISTANT */
+        .assistant-chat { display: flex; height: 520px; gap: 0; overflow: hidden; }
+        .assistant-sidebar {
+            width: 240px; min-width: 240px; display: flex; flex-direction: column;
+            background: var(--bg-elevated); border-right: 1px solid var(--border);
+            transition: min-width .2s, width .2s;
+        }
+        .assistant-sidebar.collapsed { width: 0; min-width: 0; overflow: hidden; border-right: none; }
+        .assistant-sidebar-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+        }
+        .assistant-sidebar-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); }
+        .assistant-session-list { flex: 1; overflow-y: auto; padding: 6px; }
+        .assistant-session-item {
+            padding: 8px 10px; border-radius: 6px; cursor: pointer;
+            font-size: 12px; color: var(--text-secondary); white-space: nowrap;
+            overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px;
+        }
+        .assistant-session-item:hover { background: var(--panel-hover); color: var(--text); }
+        .assistant-session-item.active { background: var(--accent-soft); color: var(--accent); }
+        .assistant-session-empty { padding: 14px 10px; color: var(--text-muted); font-size: 11px; text-align: center; }
+        .assistant-sidebar-divider { height: 1px; background: var(--border); flex-shrink: 0; margin: 4px 0; }
+        .assistant-sidebar-footer { padding: 8px 12px; display: flex; gap: 6px; flex-shrink: 0; }
+        .assistant-settings-panel {
+            display: none; padding: 10px 12px; border-top: 1px solid var(--border);
+            background: var(--bg-elevated); flex-shrink: 0;
+        }
+        .assistant-settings-panel.open { display: block; }
+        .assistant-settings-title { font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .08em; }
+        .assistant-settings-row { display: flex; gap: 6px; margin-bottom: 6px; }
+        .assistant-settings-row select, .assistant-settings-row input {
+            flex: 1; padding: 6px 8px; font-size: 11px; border-radius: 6px;
+            background: #0a1019; border: 1px solid var(--border); color: var(--text-secondary);
+        }
+        .assistant-settings-actions { display: flex; gap: 6px; margin-top: 8px; }
+        .assistant-settings-status { font-size: 10px; color: var(--text-muted); margin-top: 6px; font-family: var(--mono); }
+
+        .assistant-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .assistant-messages { height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px; background: #04070d; border: 1px solid var(--border); border-radius: 8px; flex: 1; }
         .assistant-message { max-width: 88%; padding: 10px 12px; border-radius: 8px; white-space: pre-wrap; line-height: 1.5; font-size: 12px; }
         .assistant-message.user { align-self: flex-end; background: var(--accent-soft); border: 1px solid rgba(56,189,248,.25); }
         .assistant-message.assistant { align-self: flex-start; background: rgba(255,255,255,.035); border: 1px solid var(--border); }
-        .assistant-activity { min-height: 18px; color: var(--text-muted); font-family: var(--mono); font-size: 11px; }
-        .assistant-composer { position: relative; display: flex; gap: 8px; }
+        .assistant-activity { min-height: 18px; color: var(--text-muted); font-family: var(--mono); font-size: 11px; flex-shrink: 0; }
+        .assistant-composer { position: relative; display: flex; gap: 8px; flex-shrink: 0; }
         .assistant-input { flex: 1; min-height: 42px; resize: vertical; padding: 10px 12px; color: var(--text); background: #0a1019; border: 1px solid var(--border-light); border-radius: 7px; font-size: 12px; }
         .assistant-suggestions { position: absolute; left: 0; right: 76px; bottom: calc(100% + 6px); display: none; max-height: 180px; overflow-y: auto; background: var(--panel-strong); border: 1px solid var(--border-light); border-radius: 7px; box-shadow: var(--shadow); z-index: 5; }
-        .assistant-suggestion { padding: 8px 10px; color: var(--text-secondary); font-family: var(--mono); font-size: 11px; cursor: pointer; }
-        .assistant-suggestion:hover { color: var(--text); background: rgba(255,255,255,.06); }
-        .assistant-provider-field { min-width: 180px; flex: 1; }
+        .assistant-suggestion { padding: 8px 10px; color: var(--text-secondary); font-family: var(--mono); font-size: 11px; cursor: pointer; outline: none; }
+        .assistant-suggestion:hover, .assistant-suggestion.selected { color: var(--text); background: rgba(255,255,255,.06); }
+        .assistant-sidebar-toggle {
+            background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--text-muted);
+            cursor: pointer; padding: 4px 8px; font-size: 13px; line-height: 1; transition: color .15s;
+        }
+        .assistant-sidebar-toggle:hover { color: var(--text); }
     </style>
 </head>
 <body>
@@ -406,42 +448,54 @@
                 </div>
             </div>
 
+            <!-- ASSISTANT TAB -->
             <div id="tab-assistant" style="display:none">
-                <div class="console-toolbar">
-                    <div class="live-indicator"><span></span>HERMES</div>
-                    <div id="assistant-status" class="log-meta">Checking assistant...</div>
-                    <button class="btn" onclick="newAssistantChat()">＋ New Chat</button>
-                    <button class="btn" onclick="toggleProviderPanel()">⚙ Providers</button>
-                    <button class="btn btn-stop" id="assistant-stop" onclick="stopAssistant()" disabled>⏹ Stop</button>
-                </div>
-                <div class="console-body assistant-chat">
-                    <div id="assistant-messages" class="assistant-messages"></div>
-                    <div id="assistant-activity" class="assistant-activity"></div>
-                    <div id="assistant-provider-panel" class="console-toolbar" style="display:none; flex-wrap:wrap;">
-                        <select id="assistant-provider" class="bot-select">
-                            <option value="openrouter">OpenRouter</option>
-                            <option value="openai">OpenAI</option>
-                            <option value="anthropic">Anthropic</option>
-                            <option value="google">Google Gemini</option>
-                            <option value="xai">xAI</option>
-                            <option value="deepseek">DeepSeek</option>
-                            <option value="groq">Groq</option>
-                            <option value="github_copilot">GitHub Copilot</option>
-                            <option value="telegram">Hermes Telegram</option>
-                            <option value="ninerouter">9Router (local)</option>
-                            <option value="custom">Custom OpenAI-Compatible</option>
-                        </select>
-                        <input id="assistant-provider-base-url" class="log-search assistant-provider-field" type="url" placeholder="Base URL, e.g. https://router.example/v1">
-                        <input id="assistant-provider-value" class="log-search assistant-provider-field" type="password" placeholder="Provider key or token">
-                        <input id="assistant-provider-model" class="log-search assistant-provider-field" type="text" placeholder="Model ID">
-                        <button class="btn" onclick="fetchAssistantModels()">↻ Fetch Models</button>
-                        <button class="btn btn-start" onclick="saveAssistantProvider()">Save & Restart Hermes</button>
-                        <span id="assistant-provider-status" class="log-meta"></span>
-                    </div>
-                    <div class="assistant-composer">
-                        <div id="assistant-suggestions" class="assistant-suggestions"></div>
-                        <textarea id="assistant-input" class="assistant-input" rows="2" placeholder="Ask Hermes to inspect or manage the server..."></textarea>
-                        <button class="btn btn-start" onclick="sendAssistantMessage()">Send</button>
+                <div class="console-body">
+                    <div class="assistant-chat">
+                        <!-- LEFT SIDEBAR -->
+                        <div class="assistant-sidebar" id="assistant-sidebar">
+                            <div class="assistant-sidebar-header">
+                                <div class="assistant-sidebar-title">Sessions</div>
+                                <button class="assistant-sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">◀</button>
+                            </div>
+                            <div class="assistant-session-list" id="assistant-session-list">
+                                <div class="assistant-session-empty">No sessions loaded</div>
+                            </div>
+                            <div class="assistant-sidebar-divider"></div>
+                            <div class="assistant-settings-panel" id="assistant-settings-panel">
+                                <div class="assistant-settings-title">Settings</div>
+                                <div class="assistant-settings-row">
+                                    <select id="assistant-provider-select"></select>
+                                </div>
+                                <div class="assistant-settings-row">
+                                    <input id="assistant-base-url" type="url" placeholder="Base URL, e.g. https://router.example/v1">
+                                </div>
+                                <div class="assistant-settings-row">
+                                    <input id="assistant-api-key" type="password" placeholder="API Key or Token">
+                                </div>
+                                <div class="assistant-settings-row">
+                                    <input id="assistant-model" type="text" placeholder="Model ID">
+                                </div>
+                                <div class="assistant-settings-actions">
+                                    <button class="btn btn-start" onclick="saveAssistantProvider()">Save & Restart Hermes</button>
+                                    <button class="btn" onclick="hideProviderPanel()">Cancel</button>
+                                </div>
+                                <div class="assistant-settings-status" id="assistant-settings-status"></div>
+                            </div>
+                            <div class="assistant-sidebar-footer">
+                                <button class="btn btn-start" onclick="toggleProviderPanel()">⚙ Providers</button>
+                            </div>
+                        </div>
+                        <!-- RIGHT MAIN CHAT AREA -->
+                        <div class="assistant-main">
+                            <div id="assistant-messages" class="assistant-messages"></div>
+                            <div id="assistant-activity" class="assistant-activity"></div>
+                            <div class="assistant-composer">
+                                <div id="assistant-suggestions" class="assistant-suggestions"></div>
+                                <textarea id="assistant-input" class="assistant-input" rows="2" placeholder="Ask Hermes to inspect or manage the server..."></textarea>
+                                <button class="btn btn-start" onclick="sendAssistantMessage()">Send</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -462,6 +516,7 @@
     let assistantMessages = [];
     let assistantAbort = null;
     let assistantRequestId = '';
+    let assistantSelectedIndex = -1;
     const assistantCommands = ['/help', '/new', '/reset', '/status', '/stop', '/model', '/tools', '/skills', '/sessions', '/resume', '/bg', '/approve', '/deny', '/compress', '/sethome'];
 
     function showToast(msg, type = 'success') {
@@ -670,98 +725,148 @@
         }
     }
 
-    function toggleProviderPanel() {
-        const panel = document.getElementById('assistant-provider-panel');
-        panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+    // Sidebar toggle
+    function toggleSidebar() {
+        const sidebar = document.getElementById('assistant-sidebar');
+        sidebar.classList.toggle('collapsed');
+        // Resize chat area when sidebar collapses
+        setTimeout(() => {
+            const messages = document.getElementById('assistant-messages');
+            if (messages) renderAssistantMessages();
+        }, 220);
     }
 
-    function updateProviderFields() {
-        const provider = document.getElementById('assistant-provider').value;
-        const custom = provider === 'custom' || provider === 'ninerouter';
-        const baseUrl = document.getElementById('assistant-provider-base-url');
-        baseUrl.style.display = custom ? 'block' : 'none';
-        baseUrl.required = custom;
-        if (provider === 'ninerouter') {
-            baseUrl.value = 'http://127.0.0.1:20128/v1';
-        }
-    }
-
-    async function fetchAssistantModels() {
-        const status = document.getElementById('assistant-provider-status');
-        const baseUrl = document.getElementById('assistant-provider-base-url').value.trim();
-        const apiKey = document.getElementById('assistant-provider-value').value.trim();
-        if (!baseUrl) return showToast('Enter a provider base URL first.', 'error');
-        status.innerText = 'Connecting to provider...';
+    // Session list rendering from Hermes API
+    async function loadSessions() {
         try {
-            const res = await fetch('/api/assistant/models', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ base_url: baseUrl, api_key: apiKey })
-            });
+            const res = await fetch('/api/assistant/sessions');
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Model discovery failed');
-            const modelInput = document.getElementById('assistant-provider-model');
-            modelInput.setAttribute('list', 'assistant-model-options');
-            let list = document.getElementById('assistant-model-options');
-            if (!list) {
-                list = document.createElement('datalist');
-                list.id = 'assistant-model-options';
-                document.body.appendChild(list);
+            const list = document.getElementById('assistant-session-list');
+            list.innerHTML = '';
+            if (data.data && data.data.length === 0) {
+                list.innerHTML = '<div class="assistant-session-empty">No sessions found</div>';
+                return;
             }
-            list.innerHTML = data.models.map(model => `<option value="${model.replace(/"/g, '&quot;')}"></option>`).join('');
-            if (data.models.length === 1) modelInput.value = data.models[0];
-            status.innerText = `${data.models.length} models found`;
-        } catch (error) {
-            status.innerText = error.message;
-            showToast(error.message, 'error');
+            const sessions = data.data || [];
+            sessions.forEach((session, index) => {
+                const div = document.createElement('div');
+                div.className = 'assistant-session-item';
+                const title = session.title || session.id || 'Session';
+                div.innerText = title;
+                div.dataset.sessionId = session.id;
+                div.onclick = () => loadSession(session.id);
+                list.appendChild(div);
+            });
+        } catch (e) {
+            console.error("Load sessions error", e);
         }
+    }
+
+    function loadSession(sessionId) {
+        // Highlight selected session
+        document.querySelectorAll('.assistant-session-item').forEach(el => el.classList.remove('active'));
+        const el = document.querySelector(`.assistant-session-item[data-session-id="${sessionId}"]`);
+        if (el) el.classList.add('active');
+        // Load session messages from Hermes
+        loadSessionMessages(sessionId);
+    }
+
+    async function loadSessionMessages(sessionId) {
+        document.getElementById('assistant-activity').innerText = 'Loading session...';
+        try {
+            const res = await fetch(`/api/assistant/sessions/${encodeURIComponent(sessionId)}`);
+            const data = await res.json();
+            // Populate chat with session history
+            if (data.messages) {
+                assistantMessages = data.messages;
+            } else {
+                // Try reading messages from sessions list
+                assistantMessages = [];
+            }
+            renderAssistantMessages();
+            document.getElementById('assistant-activity').innerText = '';
+            // Persist selected session in sessionStorage
+            sessionStorage.setItem('assistant_session_id', sessionId);
+        } catch (e) {
+            document.getElementById('assistant-activity').innerText = `Error loading session: ${e.message}`;
+        }
+    }
+
+    // Provider settings panel
+    function toggleProviderPanel() {
+        const panel = document.getElementById('assistant-settings-panel');
+        panel.classList.toggle('open');
+        const footerBtns = document.querySelector('.assistant-sidebar-footer');
+        footerBtns.style.display = panel.classList.contains('open') ? 'none' : 'flex';
+        // Populate provider select
+        const select = document.getElementById('assistant-provider-select');
+        if (select.options.length <= 1) {
+            const providers = ['openrouter', 'openai', 'anthropic', 'google', 'xai', 'deepseek', 'groq', 'github_copilot', 'telegram', 'ninerouter', 'custom'];
+            providers.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p;
+                opt.textContent = p.charAt(0).toUpperCase() + p.slice(1);
+                select.appendChild(opt);
+            });
+        }
+        // Load current settings
+        loadCurrentSettings();
+    }
+
+    function hideProviderPanel() {
+        const panel = document.getElementById('assistant-settings-panel');
+        panel.classList.remove('open');
+        document.querySelector('.assistant-sidebar-footer').style.display = 'flex';
+    }
+
+    async function loadCurrentSettings() {
+        try {
+            const res = await fetch('/api/assistant/settings');
+            const data = await res.json();
+            if (data.provider) {
+                document.getElementById('assistant-provider-select').value = data.provider;
+            }
+            if (data.base_url) {
+                document.getElementById('assistant-base-url').value = data.base_url;
+            }
+            if (data.model) {
+                document.getElementById('assistant-model').value = data.model;
+            }
+            // api_key not shown for security
+        } catch (e) {
+            console.error("Load settings error", e);
+        }
+    }
+
+    async function loadAssistantSettings() {
+        // Placeholder: refresh fields when provider changes
     }
 
     async function saveAssistantProvider() {
-        const provider = document.getElementById('assistant-provider').value;
-        const baseUrl = document.getElementById('assistant-provider-base-url').value.trim();
-        const valueInput = document.getElementById('assistant-provider-value');
-        const model = document.getElementById('assistant-provider-model').value.trim();
-        const status = document.getElementById('assistant-provider-status');
-        const value = valueInput.value.trim();
-        if (!value) return showToast('Enter a provider key or token.', 'error');
-        status.innerText = 'Saving...';
+        const provider = document.getElementById('assistant-provider-select').value;
+        const baseUrl = document.getElementById('assistant-base-url').value.trim();
+        const apiKey = document.getElementById('assistant-api-key').value.trim();
+        const model = document.getElementById('assistant-model').value.trim();
+        const statusEl = document.getElementById('assistant-settings-status');
+        statusEl.innerText = 'Saving...';
         try {
-            const res = await fetch('/api/assistant/providers', {
+            const res = await fetch('/api/assistant/settings/model', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ provider, value, model, base_url: baseUrl })
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': sessionStorage.getItem('assistant_csrf') || ''
+                },
+                body: JSON.stringify({ provider, base_url: baseUrl, api_key: apiKey, model })
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Provider save failed');
-            valueInput.value = '';
-            status.innerText = 'Saved and Hermes restarted';
+            if (!res.ok) throw new Error(data.error || 'Save failed');
+            statusEl.innerText = 'Saved and Hermes restarted';
             showToast(`${provider} configured.`, 'success');
             setTimeout(checkAssistant, 1500);
         } catch (error) {
-            status.innerText = error.message;
+            statusEl.innerText = error.message;
             showToast(error.message, 'error');
         }
-    }
-
-    function newAssistantChat() {
-        assistantMessages = [];
-        document.getElementById('assistant-activity').innerText = '';
-        renderAssistantMessages();
-    }
-
-    async function stopAssistant() {
-        if (assistantRequestId) {
-            fetch('/api/assistant/stop', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ request_id: assistantRequestId })
-            }).catch(() => {});
-        }
-        if (assistantAbort) assistantAbort.abort();
-        assistantAbort = null;
-        document.getElementById('assistant-stop').disabled = true;
-        document.getElementById('assistant-activity').innerText = 'Stopped';
     }
 
     async function sendAssistantMessage() {
@@ -769,6 +874,15 @@
         const content = input.value.trim();
         if (!content || assistantAbort) return;
         input.value = '';
+        assistantSelectedIndex = -1;
+        document.getElementById('assistant-suggestions').style.display = 'none';
+
+        // Check if message is a command
+        if (content.startsWith('/')) {
+            await sendAssistantCommand(content);
+            return;
+        }
+
         assistantMessages.push({ role: 'user', content });
         const assistantMessage = { role: 'assistant', content: 'Waking Hermes up...' };
         assistantMessages.push(assistantMessage);
@@ -840,30 +954,153 @@
         }
     }
 
+    // Command handler — sends commands directly to Hermes API without provider connection
+    async function sendAssistantCommand(commandText) {
+        const commandMessage = { role: 'user', content: commandText };
+        assistantMessages.push(commandMessage);
+        const assistantMessage = { role: 'assistant', content: '' };
+        assistantMessages.push(assistantMessage);
+        renderAssistantMessages();
+        document.getElementById('assistant-activity').innerText = 'Running command...';
+        try {
+            const res = await fetch('/api/assistant/commands', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ command: commandText })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Command failed');
+            // Display command response
+            const responseText = data.response || data.message || JSON.stringify(data);
+            assistantMessage.content = responseText;
+            document.getElementById('assistant-activity').innerText = 'Command completed';
+        } catch (e) {
+            assistantMessage.content = `Command error: ${e.message}`;
+            document.getElementById('assistant-activity').innerText = 'Command failed';
+        } finally {
+            renderAssistantMessages();
+            document.getElementById('assistant-stop').disabled = true;
+            // Persist session ID if present in response
+            if (data.session_id) {
+                sessionStorage.setItem('assistant_session_id', data.session_id);
+            }
+        }
+    }
+
+    function newAssistantChat() {
+        assistantMessages = [];
+        document.getElementById('assistant-activity').innerText = '';
+        renderAssistantMessages();
+        sessionStorage.removeItem('assistant_session_id');
+    }
+
+    async function stopAssistant() {
+        if (assistantRequestId) {
+            fetch('/api/assistant/stop', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ request_id: assistantRequestId })
+            }).catch(() => {});
+        }
+        if (assistantAbort) assistantAbort.abort();
+        assistantAbort = null;
+        document.getElementById('assistant-stop').disabled = true;
+        document.getElementById('assistant-activity').innerText = 'Stopped';
+    }
+
+    // Command suggestions with keyboard navigation
     function updateAssistantSuggestions() {
         const input = document.getElementById('assistant-input');
         const box = document.getElementById('assistant-suggestions');
         const value = input.value;
-        if (!value.startsWith('/')) { box.style.display = 'none'; return; }
+        if (!value.startsWith('/')) { box.style.display = 'none'; assistantSelectedIndex = -1; return; }
         const matches = assistantCommands.filter(command => command.startsWith(value.split(' ')[0]));
         box.innerHTML = '';
         matches.forEach(command => {
             const item = document.createElement('div');
             item.className = 'assistant-suggestion';
             item.innerText = command;
-            item.onclick = () => { input.value = `${command} `; input.focus(); box.style.display = 'none'; };
+            item.tabIndex = -1;
+            item.onclick = () => { input.value = `${command} `; input.focus(); box.style.display = 'none'; assistantSelectedIndex = -1; };
             box.appendChild(item);
         });
         box.style.display = matches.length ? 'block' : 'none';
+        assistantSelectedIndex = -1;
+    }
+
+    function selectSuggestion(index) {
+        const box = document.getElementById('assistant-suggestions');
+        const items = box.querySelectorAll('.assistant-suggestion');
+        if (index < 0 || index >= items.length) return;
+        items.forEach(item => item.classList.remove('selected'));
+        items[index].classList.add('selected');
+        items[index].scrollIntoView({ block: 'nearest' });
+        assistantSelectedIndex = index;
+    }
+
+    function applySelectedSuggestion() {
+        const box = document.getElementById('assistant-suggestions');
+        if (assistantSelectedIndex >= 0 && assistantSelectedIndex < box.children.length) {
+            const selected = box.children[assistantSelectedIndex];
+            const command = selected.innerText;
+            const input = document.getElementById('assistant-input');
+            const currentPrefix = input.value.split(' ')[0];
+            input.value = `${command} `;
+            input.focus();
+            box.style.display = 'none';
+            assistantSelectedIndex = -1;
+            return true;
+        }
+        return false;
     }
 
     document.getElementById('assistant-input').addEventListener('input', updateAssistantSuggestions);
     document.getElementById('assistant-input').addEventListener('keydown', event => {
-        if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendAssistantMessage(); }
-        if (event.key === 'Escape') document.getElementById('assistant-suggestions').style.display = 'none';
+        const box = document.getElementById('assistant-suggestions');
+        const isVisible = box.style.display === 'block';
+
+        if (event.key === 'Enter' && !event.shiftKey) {
+            if (isVisible && assistantSelectedIndex >= 0) {
+                event.preventDefault();
+                applySelectedSuggestion();
+                return;
+            }
+            event.preventDefault();
+            sendAssistantMessage();
+            return;
+        }
+        if (event.key === 'Escape') {
+            box.style.display = 'none';
+            assistantSelectedIndex = -1;
+            return;
+        }
+        if (isVisible) {
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                const items = box.querySelectorAll('.assistant-suggestion');
+                if (items.length === 0) return;
+                if (assistantSelectedIndex < items.length - 1) {
+                    selectSuggestion(assistantSelectedIndex + 1);
+                } else {
+                    selectSuggestion(0);
+                }
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                const items = box.querySelectorAll('.assistant-suggestion');
+                if (items.length === 0) return;
+                if (assistantSelectedIndex > 0) {
+                    selectSuggestion(assistantSelectedIndex - 1);
+                } else {
+                    selectSuggestion(items.length - 1);
+                }
+            } else if (event.key === 'Tab' && assistantSelectedIndex >= 0) {
+                event.preventDefault();
+                applySelectedSuggestion();
+            }
+        }
     });
-    document.getElementById('assistant-provider').addEventListener('change', updateProviderFields);
-    updateProviderFields();
+
+    document.getElementById('assistant-provider-select').addEventListener('change', loadAssistantSettings);
 
     async function controlBot(bot, action) {
         try {
@@ -903,6 +1140,27 @@
             showToast("Redeploy request sent.", "success");
         }
     }
+
+    // Load session on tab switch if one is stored
+    async function ensureSessionLoaded() {
+        if (currentTab !== 'assistant') return;
+        const storedSession = sessionStorage.getItem('assistant_session_id');
+        if (storedSession) {
+            await loadSession(storedSession);
+        } else {
+            // Load session list from Hermes API
+            await loadSessions();
+        }
+    }
+
+    // Override switchTab to trigger session loading
+    const originalSwitchTab = switchTab;
+    switchTab = function(tab, btn) {
+        originalSwitchTab(tab, btn);
+        if (tab === 'assistant') {
+            setTimeout(ensureSessionLoaded, 100);
+        }
+    };
 
     setInterval(fetchStatus, 3000);
     setInterval(fetchLogs, 5000);

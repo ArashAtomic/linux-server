@@ -43,6 +43,12 @@ async def check():
                 assert client.get('/api/assistant/sessions').status_code == 401
                 with client.session_transaction() as login:
                     login['logged_in'] = True
+                    login['assistant_capabilities'] = {
+                        'sessions': True, 'runs': True, 'stream': True,
+                        'run_stop': True, 'run_approval': True,
+                        'session_chat': True, 'model_options': True,
+                        'endpoints_sessions': True,
+                    }
                 response = client.get('/api/assistant/sessions')
                 assert response.status_code == 200, response.get_data(as_text=True)
                 assert any(item['id'] == created['session']['id'] for item in response.json['data'])
