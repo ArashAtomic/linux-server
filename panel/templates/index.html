@@ -278,7 +278,13 @@
         .assistant-message { max-width: 88%; padding: 10px 12px; border-radius: 8px; white-space: pre-wrap; line-height: 1.5; font-size: 12px; }
         .assistant-message.user { align-self: flex-end; background: var(--accent-soft); border: 1px solid rgba(56,189,248,.25); }
         .assistant-message.assistant { align-self: flex-start; background: rgba(255,255,255,.035); border: 1px solid var(--border); }
-        .assistant-activity { min-height: 18px; color: var(--text-muted); font-family: var(--mono); font-size: 11px; flex-shrink: 0; }
+        .assistant-message-group { display: block; max-width: 88%; }
+        .assistant-message-group.user { align-self: flex-end; text-align: right; }
+        .assistant-message-group.assistant { align-self: flex-start; text-align: left; }
+        .assistant-message-group .assistant-message { max-width: 100%; }
+        .assistant-message-action { margin: 3px 2px 0; padding: 3px 5px; border: 0; background: transparent; color: var(--text-muted); font-size: 11px; line-height: 1; }
+        .assistant-message-action:hover:not(:disabled) { background: transparent; color: var(--text); }
+        .assistant-activity { min-height: 0px; padding-top: 4px; padding-bottom: 4px; color: var(--text-muted); font-family: var(--mono); font-size: 11px; flex-shrink: 0; }
         .assistant-composer { position: relative; display: flex; gap: 8px; flex-shrink: 0; }
         .assistant-input { flex: 1; min-height: 42px; resize: vertical; padding: 10px 12px; color: var(--text); background: #0a1019; border: 1px solid var(--border-light); border-radius: 7px; font-size: 12px; }
         .assistant-suggestions { position: absolute; left: 0; right: 76px; bottom: calc(100% + 6px); display: none; max-height: 180px; overflow-y: auto; background: var(--panel-strong); border: 1px solid var(--border-light); border-radius: 7px; box-shadow: var(--shadow); z-index: 5; }
@@ -765,11 +771,33 @@
     function renderAssistantMessages() {
         const box = document.getElementById('assistant-messages');
         box.innerHTML = '';
-        assistantMessages.forEach(message => {
+        assistantMessages.forEach((message, index) => {
+            const group = document.createElement('div');
+            group.className = `assistant-message-group ${message.role}`;
             const item = document.createElement('div');
             item.className = `assistant-message ${message.role}`;
             item.innerText = message.content;
-            box.appendChild(item);
+            group.appendChild(item);
+
+            const copyButton = document.createElement('button');
+            copyButton.className = 'btn assistant-message-action';
+            copyButton.type = 'button';
+            copyButton.title = 'Copy message';
+            copyButton.setAttribute('aria-label', 'Copy message');
+            copyButton.innerText = '⧉';
+            copyButton.onclick = () => copyAssistantMessage(message.content);
+            group.appendChild(copyButton);
+            if (message.role === 'assistant' && !message.isCommand) {
+                const regenerateButton = document.createElement('button');
+                regenerateButton.className = 'btn assistant-message-action';
+                regenerateButton.type = 'button';
+                regenerateButton.title = 'Regenerate response';
+                regenerateButton.setAttribute('aria-label', 'Regenerate response');
+                regenerateButton.innerText = '↻';
+                regenerateButton.onclick = () => regenerateAssistantMessage(index);
+                group.appendChild(regenerateButton);
+            }
+            box.appendChild(group);
         });
         box.scrollTop = box.scrollHeight;
     }
@@ -977,21 +1005,26 @@
         }
     }
 
-    async function sendAssistantMessage() {
+    async function sendAssistantMessage(reuseLastUserMessage = false) {
         const input = document.getElementById('assistant-input');
-        const content = input.value.trim();
+        const lastMessage = assistantMessages[assistantMessages.length - 1];
+        const content = reuseLastUserMessage && lastMessage?.role === 'user'
+            ? lastMessage.content
+            : input.value.trim();
         if (!content || assistantAbort) return;
         input.value = '';
         assistantSelectedIndex = -1;
         document.getElementById('assistant-suggestions').style.display = 'none';
 
         // Check if message is a command
-        if (content.startsWith('/')) {
+        if (!reuseLastUserMessage && content.startsWith('/')) {
             await sendAssistantCommand(content);
             return;
         }
 
-        assistantMessages.push({ role: 'user', content });
+        if (!reuseLastUserMessage) {
+            assistantMessages.push({ role: 'user', content });
+        }
         const assistantMessage = { role: 'assistant', content: 'Waking Hermes up...' };
         assistantMessages.push(assistantMessage);
         renderAssistantMessages();
@@ -1014,7 +1047,7 @@
                 headers: { 'Content-Type': 'application/json', 'X-Assistant-Request-Id': assistantRequestId },
                 signal: assistantAbort.signal
             });
-            if (!res.ok) throw new Error((await res.json()).error || 'Assistant request failed');
+            if (!res.ok) throw new Error(await readAssistantError(res, 'Assistant request failed'));
             const reader = res.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
@@ -1073,17 +1106,18 @@
     async function sendAssistantCommand(commandText) {
         const commandMessage = { role: 'user', content: commandText };
         assistantMessages.push(commandMessage);
-        const assistantMessage = { role: 'assistant', content: '' };
+        const assistantMessage = { role: 'assistant', content: '', isCommand: true };
         assistantMessages.push(assistantMessage);
         renderAssistantMessages();
         document.getElementById('assistant-activity').innerText = 'Running command...';
+        let data = {};
         try {
             const res = await fetch('/api/assistant/commands', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ command: commandText })
             });
-            const data = await res.json();
+            data = await readAssistantJson(res, 'Command failed');
             if (!res.ok) throw new Error(data.error || 'Command failed');
             // Display command response
             const responseText = data.response || data.message || JSON.stringify(data);
@@ -1100,6 +1134,42 @@
                 sessionStorage.setItem('assistant_session_id', data.session_id);
             }
         }
+    }
+
+    async function readAssistantJson(response, fallback) {
+        const text = await response.text();
+        if (!text) return {};
+        try {
+            return JSON.parse(text);
+        } catch (error) {
+            throw new Error(`${fallback} (HTTP ${response.status})`);
+        }
+    }
+
+    async function readAssistantError(response, fallback) {
+        try {
+            const data = await readAssistantJson(response, fallback);
+            return data.error || fallback;
+        } catch (error) {
+            return error.message;
+        }
+    }
+
+    async function copyAssistantMessage(content) {
+        try {
+            await navigator.clipboard.writeText(content);
+            showToast('Message copied to clipboard!', 'success');
+        } catch (error) {
+            showToast('Could not copy message to clipboard.', 'error');
+        }
+    }
+
+    async function regenerateAssistantMessage(index) {
+        if (assistantAbort) return;
+        const userMessage = assistantMessages[index - 1];
+        if (!userMessage || userMessage.role !== 'user') return;
+        assistantMessages = assistantMessages.slice(0, index);
+        await sendAssistantMessage(true);
     }
 
     function newAssistantChat() {

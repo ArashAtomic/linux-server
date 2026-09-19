@@ -134,7 +134,10 @@ def create_assistant_blueprint(login_required):
             ) as response:
                 if not response.ok:
                     return jsonify(error='Hermes rejected the command', upstream_status=response.status_code), 502
-                data = response.json() if response.content else {}
+                try:
+                    data = response.json() if response.content else {}
+                except ValueError:
+                    return jsonify(error='Hermes returned an unexpected command response'), 502
                 return jsonify(data)
         except (requests.RequestException, ValueError):
             return jsonify(error='Hermes command service is unavailable'), 503

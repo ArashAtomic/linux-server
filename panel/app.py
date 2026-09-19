@@ -626,8 +626,20 @@ def assistant_chat():
         return jsonify({"error": "Hermes request failed"}), 502
 
     if not upstream.ok:
+        error_detail = "Hermes rejected the request"
+        try:
+            upstream_data = upstream.json()
+            if isinstance(upstream_data, dict) and upstream_data.get("error"):
+                error_detail = str(upstream_data["error"])
+        except (ValueError, requests.RequestException):
+            pass
         upstream.close()
-        return jsonify({"error": "Hermes rejected the request"}), 502
+        return jsonify({"error": error_detail}), 502
+
+    content_type = upstream.headers.get("Content-Type", "").lower()
+    if "text/event-stream" not in content_type:
+        upstream.close()
+        return jsonify({"error": "Hermes returned an unexpected response"}), 502
 
     with ACTIVE_HERMES_REQUESTS_LOCK:
         ACTIVE_HERMES_REQUESTS[request_id] = upstream
