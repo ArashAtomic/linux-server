@@ -7,14 +7,14 @@ from flask import Blueprint, g, jsonify, request, session
 from assistant_settings import create_settings_blueprint
 
 HERMES_CAPABILITIES = {
-    'sessions': 'session_management',
+    'sessions': 'sessions',
     'runs': 'run_submission',
-    'stream': 'run_events_sse',
+    'stream': 'chat_completions_streaming',
     'run_stop': 'run_stop',
     'run_approval': 'run_approval',
     'session_chat': 'session_chat',
     'model_options': 'model_options',
-    'endpoints_sessions': 'endpoints_sessions',
+    'endpoints_sessions': 'sessions',
 }
 
 
@@ -77,12 +77,6 @@ def create_assistant_blueprint(login_required):
     @blueprint.get('/sessions')
     @login_required
     def sessions():
-        capabilities = getattr(g, 'assistant_capabilities', None)
-        if not capabilities:
-            # Fallback: read from session if capabilities endpoint wasn't hit first
-            capabilities = session.get('assistant_capabilities', {})
-        if not capabilities:
-            return jsonify(error='Hermes capabilities unavailable', missing=list(HERMES_CAPABILITIES.keys())), 503
         try:
             limit = int(request.args.get('limit', 50))
             offset = int(request.args.get('offset', 0))
@@ -109,6 +103,30 @@ def create_assistant_blueprint(login_required):
                 if not isinstance(data, dict) or not isinstance(data.get('data'), list):
                     return jsonify(error='Unexpected Hermes sessions response'), 502
                 return jsonify(data)
+        except (requests.RequestException, ValueError):
+            return jsonify(error='Hermes session service is unavailable'), 503
+
+    @blueprint.get('/sessions/<session_id>')
+    @login_required
+    def session_detail(session_id):
+        key = os.environ.get('HERMES_API_SERVER_KEY', '')
+        if not key:
+            return jsonify(error='Hermes API key is not configured'), 503
+        url = os.environ.get('HERMES_API_URL', 'http://127.0.0.1:8642').rstrip('/')
+        headers = {'Authorization': f'Bearer {key}', 'Accept': 'application/json'}
+        try:
+            with requests.get(f'{url}/api/sessions/{session_id}', headers=headers,
+                              timeout=(3, 15), allow_redirects=False) as session_response:
+                if not session_response.ok:
+                    return jsonify(error='Hermes rejected session request', upstream_status=session_response.status_code), 502
+                session_data = session_response.json()
+            with requests.get(f'{url}/api/sessions/{session_id}/messages', headers=headers,
+                              timeout=(3, 15), allow_redirects=False) as messages_response:
+                if not messages_response.ok:
+                    return jsonify(error='Hermes rejected message request', upstream_status=messages_response.status_code), 502
+                messages_data = messages_response.json()
+            messages = messages_data.get('data', []) if isinstance(messages_data, dict) else []
+            return jsonify(session=session_data.get('session', session_data), messages=messages)
         except (requests.RequestException, ValueError):
             return jsonify(error='Hermes session service is unavailable'), 503
 

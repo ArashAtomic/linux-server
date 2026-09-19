@@ -1081,7 +1081,12 @@
                             renderAssistantMessages();
                             continue;
                         }
-                        const delta = data.choices?.[0]?.delta?.content || '';
+                        const delta = data.choices?.[0]?.delta?.content
+                            || data.delta
+                            || data.content
+                            || data.message?.content
+                            || data.output_text
+                            || '';
                         // Extract chat name from response metadata if available
                         if (data.chat_name && !responseStarted) {
                             currentChatName = data.chat_name;
