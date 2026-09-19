@@ -135,11 +135,17 @@
         .stat-value { margin-top: 4px; font-family: var(--mono); font-size: 11px; color: var(--text-secondary); }
 
         .bot-actions { display: flex; gap: 7px; }
+        .btn-cancel {
+            border: 1px solid var(--border-light); border-radius: 7px; padding: 8px 12px;
+            color: var(--text-secondary); background: rgba(255,255,255,.025); cursor: pointer;
+            font-size: 11px; font-weight: 700; transition: background .15s, color .15s; justify-content: center;
+            display: inline-flex; flex: 1; min-width: 0; align-items: center; gap: 5px; text-decoration: none;
+        }
         .btn {
             border: 1px solid var(--border-light); border-radius: 7px; padding: 8px 12px;
             color: var(--text-secondary); background: rgba(255,255,255,.025); cursor: pointer;
             font-size: 11px; font-weight: 700; transition: background .15s, color .15s;
-            display: inline-flex; flex: 1; min-width: 0; align-items: center; gap: 5px; text-decoration: none;
+            display: inline-flex; align-items: center; gap: 5px; text-decoration: none;
         }
         .btn:hover:not(:disabled) { background: rgba(255,255,255,.06); color: var(--text); }
         .btn-start { color: var(--green); border-color: rgba(52,211,153,.22); flex: 0 0 auto; }
@@ -524,7 +530,7 @@
                                 </div>
                                 <div class="assistant-settings-actions">
                                     <button class="btn btn-start" onclick="saveAssistantProvider()">Save & Restart Hermes</button>
-                                    <button class="btn" onclick="hideProviderPanel()">Cancel</button>
+                                    <button class="btn-cancel" onclick="hideProviderPanel()">Cancel</button>
                                 </div>
                                 <div class="assistant-settings-status" id="assistant-settings-status"></div>
                             </div>
@@ -537,10 +543,15 @@
                         <div class="assistant-main">
                             <div id="assistant-messages" class="assistant-messages"></div>
                             <div id="assistant-activity" class="assistant-activity"></div>
+                            <!-- Chat name display -->
+                            <div id="chat-name-display" class="assistant-activity" style="background: var(--panel-strong); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 8px 12px; margin: 8px 0; display:none;">
+                                <span id="chat-name-label" style="color: var(--text-secondary); font-size: 11px; text-transform: uppercase; letter-spacing: .08em;">New chat</span>
+                                <span id="chat-name-value" style="margin-left: 6px; color: var(--text); font-family: var(--mono);"></span>
+                            </div>
                             <div class="assistant-composer">
                                 <div id="assistant-suggestions" class="assistant-suggestions"></div>
                                 <textarea id="assistant-input" class="assistant-input" rows="2" placeholder="Ask Hermes to inspect or manage the server..."></textarea>
-                                <button class="btn btn-start" onclick="sendAssistantMessage()">Send</button>
+                                <button class="btn btn-start" onclick="sendAssistantMessage()">➤</button>
                             </div>
                         </div>
                     </div>
@@ -564,6 +575,7 @@
     let assistantAbort = null;
     let assistantRequestId = '';
     let assistantSelectedIndex = -1;
+    let currentChatName = 'New chat';
     const assistantCommands = ['/help', '/new', '/reset', '/status', '/stop', '/model', '/tools', '/skills', '/sessions', '/resume', '/bg', '/approve', '/deny', '/compress', '/sethome'];
 
     function showToast(msg, type = 'success') {
@@ -822,14 +834,37 @@
                 const div = document.createElement('div');
                 div.className = 'assistant-session-item';
                 const title = session.title || session.id || 'Session';
-                div.innerText = title;
+                // Make title editable
+                div.dataset.originalTitle = title;
+                div.innerHTML = `<span class="session-title" contenteditable="true" onblur="saveSessionTitle(this)" onfocus="this.select()">${title}</span>`;
                 div.dataset.sessionId = session.id;
-                div.onclick = () => loadSession(session.id);
+                div.onclick = (e) => {
+                    // Don't toggle if clicking on the title input
+                    if (e.target.className === 'session-title') return;
+                    loadSession(session.id);
+                };
                 list.appendChild(div);
             });
         } catch (e) {
             console.error("Load sessions error", e);
         }
+    }
+
+    function saveSessionTitle(input) {
+        const title = input.innerText.trim();
+        const sessionId = input.parentElement.dataset.sessionId;
+        if (!title || title === input.dataset.originalTitle) return;
+        fetch(`/api/assistant/sessions/${encodeURIComponent(sessionId)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title })
+        }).then(() => {
+            input.dataset.originalTitle = title;
+            showToast('Session title updated', 'success');
+        }).catch(() => {
+            showToast('Failed to update session title', 'error');
+            input.innerText = input.dataset.originalTitle;
+        });
     }
 
     function loadSession(sessionId) {
@@ -871,7 +906,7 @@
         // Populate provider select
         const select = document.getElementById('assistant-provider-select');
         if (select.options.length <= 1) {
-            const providers = ['openrouter', 'openai', 'anthropic', 'google', 'xai', 'deepseek', 'groq', 'github_copilot', 'telegram', 'ninerouter', 'custom'];
+            const providers = ['openrouter', 'openai', 'anthropic', 'google', 'xai', 'deepseek', 'groq', 'github_copilot', 'telegram', '9router', 'custom'];
             providers.forEach(p => {
                 const opt = document.createElement('option');
                 opt.value = p;
@@ -995,6 +1030,13 @@
                     try {
                         const data = JSON.parse(line.slice(6));
                         const delta = data.choices?.[0]?.delta?.content || '';
+                        // Extract chat name from response metadata if available
+                        if (data.chat_name && !responseStarted) {
+                            currentChatName = data.chat_name;
+                            document.getElementById('chat-name-label').innerText = currentChatName;
+                            document.getElementById('chat-name-value').innerText = currentChatName;
+                            document.getElementById('chat-name-display').style.display = 'block';
+                        }
                         if (delta && !responseStarted) {
                             responseStarted = true;
                             assistantMessage.content = '';
@@ -1059,7 +1101,11 @@
 
     function newAssistantChat() {
         assistantMessages = [];
+        currentChatName = 'New chat';
         document.getElementById('assistant-activity').innerText = '';
+        document.getElementById('chat-name-display').style.display = 'none';
+        document.getElementById('chat-name-label').innerText = 'New chat';
+        document.getElementById('chat-name-value').innerText = '';
         renderAssistantMessages();
         sessionStorage.removeItem('assistant_session_id');
     }
