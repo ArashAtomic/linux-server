@@ -617,20 +617,26 @@ def assistant_chat():
     try:
         upstream = requests.post(
             f"{HERMES_API_URL}/v1/chat/completions",
-            headers={**hermes_headers(), "Content-Type": "application/json"},
+            headers={**hermes_headers(), "Accept": "text/event-stream", "Content-Type": "application/json"},
             json=upstream_payload,
             stream=True,
             timeout=(5, 90)
         )
+    except requests.Timeout:
+        return jsonify({"error": "Hermes request timed out while waiting for the gateway"}), 504
     except requests.RequestException:
-        return jsonify({"error": "Hermes request failed"}), 502
+        return jsonify({"error": "Hermes request failed while connecting to the gateway"}), 502
 
     if not upstream.ok:
         error_detail = "Hermes rejected the request"
         try:
             upstream_data = upstream.json()
             if isinstance(upstream_data, dict) and upstream_data.get("error"):
-                error_detail = str(upstream_data["error"])
+                error_value = upstream_data["error"]
+                if isinstance(error_value, dict):
+                    error_detail = str(error_value.get("message") or error_value.get("code") or error_detail)
+                else:
+                    error_detail = str(error_value)
         except (ValueError, requests.RequestException):
             pass
         upstream.close()
