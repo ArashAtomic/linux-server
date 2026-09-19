@@ -906,7 +906,7 @@
         // Populate provider select
         const select = document.getElementById('assistant-provider-select');
         if (select.options.length <= 1) {
-            const providers = ['openrouter', 'openai', 'anthropic', 'google', 'xai', 'deepseek', 'groq', 'github_copilot', 'telegram', '9router', 'custom'];
+            const providers = ['openrouter', 'openai', 'anthropic', 'gemini', 'xai', 'deepseek', 'groq', 'copilot', 'ninerouter', 'custom'];
             providers.forEach(p => {
                 const opt = document.createElement('option');
                 opt.value = p;
@@ -928,6 +928,9 @@
         try {
             const res = await fetch('/api/assistant/settings');
             const data = await res.json();
+            if (data.csrf_token) {
+                sessionStorage.setItem('assistant_csrf', data.csrf_token);
+            }
             if (data.provider) {
                 document.getElementById('assistant-provider-select').value = data.provider;
             }

@@ -79,7 +79,7 @@ def _status(home):
 
 
 def create_settings_blueprint(login_required):
-    blueprint = Blueprint('assistant_settings', __name__, url_prefix='/api/assistant/settings')
+    blueprint = Blueprint('assistant_settings', __name__, url_prefix='/settings')
 
     @blueprint.before_request
     @login_required
@@ -90,7 +90,11 @@ def create_settings_blueprint(login_required):
     def get_settings():
         try:
             with _LOCK:
-                return jsonify(_status(_home()))
+                if not session.get('assistant_csrf'):
+                    session['assistant_csrf'] = os.urandom(32).hex()
+                settings = _status(_home())
+                settings['csrf_token'] = session['assistant_csrf']
+                return jsonify(settings)
         except (OSError, ValueError, yaml.YAMLError):
             return jsonify(error='Unable to read Hermes settings'), 503
 
@@ -120,8 +124,8 @@ def create_settings_blueprint(login_required):
             return jsonify(error='Invalid base_url'), 400
         if provider in ('custom', 'ninerouter'):
             base_url = NINEROUTER_URL if provider == 'ninerouter' else (base_url or '').strip()
-            if not base_url or not re.match(r'^https://[^\s/]+', base_url):
-                return jsonify(error='A valid HTTPS base URL is required for this provider'), 400
+            if not base_url or not re.match(r'^https?://[^\s/]+', base_url):
+                return jsonify(error='A valid HTTP or HTTPS base URL is required for this provider'), 400
         else:
             base_url = None
 
