@@ -653,7 +653,7 @@ def assistant_chat():
     @stream_with_context
     def relay_events():
         try:
-            for line in upstream.iter_lines(decode_unicode=True):
+            for line in upstream.iter_lines(decode_unicode=True, chunk_size=1):
                 if line:
                     yield f"{line}\n\n"
         finally:

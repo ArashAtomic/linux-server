@@ -290,7 +290,7 @@
         .assistant-model-label { text-transform: uppercase; letter-spacing: .08em; }
         .assistant-model-value { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .assistant-activity { min-height: 0px; padding-top: 4px; padding-bottom: 4px; color: var(--text-muted); font-family: var(--mono); font-size: 11px; flex-shrink: 0; }
-        .assistant-composer { position: relative; display: flex; gap: 8px; flex-shrink: 0; }
+        .assistant-composer { position: relative; padding-bottom: 2px; padding-top: 2px; display: flex; gap: 8px; flex-shrink: 0; }
         .assistant-input { flex: 1; min-height: 42px; resize: vertical; padding: 10px 12px; color: var(--text); background: #0a1019; border: 1px solid var(--border-light); border-radius: 7px; font-size: 12px; }
         .assistant-suggestions { position: absolute; left: 0; right: 76px; bottom: calc(100% + 6px); display: none; max-height: 180px; overflow-y: auto; background: var(--panel-strong); border: 1px solid var(--border-light); border-radius: 7px; box-shadow: var(--shadow); z-index: 5; }
         .assistant-suggestion { padding: 8px 10px; color: var(--text-secondary); font-family: var(--mono); font-size: 11px; cursor: pointer; outline: none; }
@@ -943,7 +943,7 @@
         // Populate provider select
         const select = document.getElementById('assistant-provider-select');
         if (select.options.length <= 1) {
-            const providers = ['openrouter', 'openai', 'anthropic', 'gemini', 'xai', 'deepseek', 'groq', 'copilot', 'ninerouter', 'custom'];
+            const providers = ['OpenRouter', 'OpenAI', 'Anthropic', 'Gemini', 'XAI', 'DeepSeek', 'Groq', 'Copilot', '9Router', 'Custom OpenAI-Compatible'];
             providers.forEach(p => {
                 const opt = document.createElement('option');
                 opt.value = p;
