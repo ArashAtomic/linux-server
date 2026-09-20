@@ -342,6 +342,781 @@
             display: grid; place-items: center;
         }
     </style>
+
+<style id="design-polish">
+/* ═══════════════════════════════════════════════════════════════════════════
+   BOT CONTROL CENTER — VISUAL POLISH
+   Keeps the existing DOM + JavaScript intact and upgrades the visual system.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+    --bg: #070a10;
+    --bg-elevated: #0b1018;
+    --panel: rgba(15, 22, 34, .82);
+    --panel-hover: rgba(20, 30, 45, .92);
+    --panel-strong: #121b2a;
+
+    --border: rgba(148, 163, 184, .13);
+    --border-light: rgba(148, 163, 184, .22);
+    --border-glow: rgba(56, 189, 248, .30);
+
+    --text: #f5f7fb;
+    --text-secondary: #a8b3c4;
+    --text-muted: #68758a;
+
+    --accent: #55c7ff;
+    --accent-strong: #20b8ff;
+    --accent-soft: rgba(56, 189, 248, .11);
+
+    --green: #39e6a1;
+    --green-soft: rgba(57, 230, 161, .10);
+    --yellow: #ffc857;
+    --yellow-soft: rgba(255, 200, 87, .10);
+    --red: #ff6b81;
+    --red-soft: rgba(255, 107, 129, .10);
+    --purple: #aa8cff;
+    --purple-soft: rgba(170, 140, 255, .10);
+
+    --radius: 16px;
+    --radius-small: 10px;
+    --shadow: 0 18px 55px rgba(0,0,0,.28), 0 2px 8px rgba(0,0,0,.18);
+    --shadow-hover: 0 22px 65px rgba(0,0,0,.36), 0 0 0 1px rgba(85,199,255,.08);
+}
+
+/* Base */
+html {
+    background: #070a10;
+    scrollbar-color: #263448 transparent;
+    scrollbar-width: thin;
+}
+body {
+    min-height: 100vh;
+    background:
+        radial-gradient(900px 520px at 4% -8%, rgba(56,189,248,.12), transparent 60%),
+        radial-gradient(800px 500px at 102% 5%, rgba(139,92,246,.10), transparent 58%),
+        radial-gradient(650px 450px at 55% 110%, rgba(20,184,166,.055), transparent 65%),
+        linear-gradient(180deg, #070a10 0%, #080c13 52%, #070a10 100%);
+    color: var(--text);
+    font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    letter-spacing: -.01em;
+}
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    opacity: .22;
+    background-image:
+        linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: linear-gradient(to bottom, black, transparent 88%);
+}
+button, input, select, textarea { font-family: inherit; }
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #263448 transparent;
+}
+*::-webkit-scrollbar { width: 7px; height: 7px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+    background: #263448;
+    border-radius: 99px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+/* App shell */
+.app {
+    width: min(1540px, 100%);
+    max-width: none;
+    margin: 0 auto;
+    padding: 28px 32px 44px;
+}
+.section { margin-bottom: 26px; }
+.section-heading {
+    margin-bottom: 11px;
+    padding: 0 3px;
+}
+.section-title {
+    font-size: 10px;
+    letter-spacing: .14em;
+    color: #748197;
+}
+.section-info {
+    color: #536075;
+    font-size: 10px;
+}
+
+/* Header */
+.header {
+    min-height: 68px;
+    margin-bottom: 28px;
+    padding: 13px 14px 13px 16px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: rgba(11,16,24,.68);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(20px) saturate(125%);
+}
+.brand { gap: 13px; }
+.brand-mark {
+    width: 44px;
+    height: 44px;
+    border-radius: 13px;
+    background:
+        radial-gradient(circle at 30% 20%, rgba(255,255,255,.25), transparent 28%),
+        linear-gradient(135deg, rgba(56,189,248,.24), rgba(139,92,246,.20));
+    border: 1px solid rgba(85,199,255,.24);
+    box-shadow: 0 8px 25px rgba(56,189,248,.12), inset 0 1px 0 rgba(255,255,255,.08);
+}
+.brand-title { font-size: 16px; letter-spacing: -.025em; }
+.brand-subtitle {
+    color: #5f6d81;
+    font-size: 10px;
+    letter-spacing: .04em;
+}
+.header-meta { gap: 8px; }
+.system-pill {
+    height: 31px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.025);
+    border-color: var(--border);
+    color: #8491a4;
+}
+.system-dot { width: 6px; height: 6px; }
+.header .btn { height: 31px; }
+
+/* Universal controls */
+.btn, .btn-cancel {
+    min-height: 32px;
+    border-radius: 9px;
+    border-color: var(--border-light);
+    background: rgba(255,255,255,.035);
+    color: #9ba8ba;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+    transition: transform .16s ease, background .16s ease, border-color .16s ease,
+                color .16s ease, box-shadow .16s ease;
+}
+.btn:hover:not(:disabled), .btn-cancel:hover {
+    background: rgba(255,255,255,.07);
+    border-color: rgba(148,163,184,.34);
+    color: #f2f5f9;
+    transform: translateY(-1px);
+}
+.btn:active { transform: translateY(0); }
+.btn-start:hover { box-shadow: 0 0 22px rgba(57,230,161,.09); }
+.btn-stop:hover { box-shadow: 0 0 22px rgba(255,107,129,.09); }
+.btn-restart:hover { box-shadow: 0 0 22px rgba(255,200,87,.09); }
+
+/* Panels */
+.panel {
+    position: relative;
+    overflow: hidden;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.026), rgba(255,255,255,.008)),
+        rgba(13,19,29,.80);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(18px) saturate(120%);
+}
+.panel::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 18px;
+    right: 18px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.075), transparent);
+    pointer-events: none;
+}
+
+/* Metrics */
+.metrics { gap: 12px; }
+.metric-card {
+    min-height: 144px;
+    padding: 17px 18px 15px;
+    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.metric-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(148,163,184,.22);
+    box-shadow: var(--shadow-hover);
+}
+.metric-top { margin-bottom: 15px; }
+.metric-label {
+    color: #7f8da1;
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+.metric-icon {
+    width: 31px;
+    height: 31px;
+    border-radius: 9px;
+    background: rgba(255,255,255,.035);
+    border: 1px solid var(--border);
+    filter: saturate(.85);
+}
+.metric-value {
+    font-size: 22px;
+    line-height: 1;
+    color: #f4f7fb;
+}
+.metric-detail { color: #5f6d81; font-size: 10px; }
+.progress {
+    height: 5px;
+    margin-top: 16px;
+    background: rgba(255,255,255,.045);
+    border: 1px solid rgba(255,255,255,.025);
+}
+.progress > div {
+    background: linear-gradient(90deg, #28aeea, #72d7ff);
+    box-shadow: 0 0 14px rgba(56,189,248,.25);
+}
+
+/* Fleet cards */
+.bot-grid { gap: 12px; }
+.bot-card {
+    padding: 18px;
+    transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+.bot-card:hover {
+    transform: translateY(-2px);
+    background: rgba(18,27,41,.92);
+    border-color: rgba(148,163,184,.23);
+    box-shadow: var(--shadow-hover);
+}
+.bot-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+    background: linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018));
+    border-color: rgba(148,163,184,.16);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+}
+.bot-name { font-size: 14px; letter-spacing: -.015em; }
+.bot-id {
+    color: #56657a;
+    font-size: 9px;
+    letter-spacing: .03em;
+}
+.status {
+    padding: 6px 9px;
+    border-radius: 999px;
+    letter-spacing: .06em;
+    background: rgba(255,255,255,.025);
+}
+.status.running {
+    border-color: rgba(57,230,161,.22);
+    background: rgba(57,230,161,.075);
+    box-shadow: inset 0 0 18px rgba(57,230,161,.025);
+}
+.status.stopped {
+    border-color: rgba(255,107,129,.20);
+    background: rgba(255,107,129,.065);
+}
+.bot-stats {
+    margin: 19px 0 15px;
+    border-color: var(--border);
+    background: rgba(0,0,0,.07);
+    border-radius: 10px;
+}
+.bot-stat { padding: 10px 11px; }
+.bot-stat + .bot-stat { border-left-color: var(--border); }
+.stat-label { color: #59677a; font-size: 8px; }
+.stat-value { color: #9ba8ba; font-size: 10px; }
+.bot-actions { gap: 7px; }
+.bot-actions .btn { min-height: 34px; }
+
+/* Console */
+.console { border-radius: 17px; }
+.console-header {
+    min-height: 58px;
+    padding: 10px 12px;
+    background: rgba(255,255,255,.012);
+    border-bottom-color: var(--border);
+}
+.console-tabs {
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid rgba(255,255,255,.045);
+    border-radius: 10px;
+    background: rgba(0,0,0,.14);
+}
+.tab-btn {
+    min-height: 32px;
+    padding: 7px 12px;
+    border-radius: 7px;
+    color: #69768a;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.tab-btn:hover { color: #b8c2d0; }
+.tab-btn.active {
+    color: #edf3fa;
+    background: #151f2e;
+    border-color: rgba(148,163,184,.12);
+    box-shadow: 0 2px 10px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.045);
+}
+.bot-select, .log-search, .assistant-input,
+.assistant-settings-row select, .assistant-settings-row input {
+    border-color: var(--border-light);
+    background: #090f18;
+    color: #c5cfdb;
+    border-radius: 9px;
+}
+.bot-select { min-width: 180px; height: 34px; }
+.console-toolbar {
+    min-height: 48px;
+    padding: 8px 13px;
+    background: rgba(0,0,0,.12);
+    border-bottom-color: var(--border);
+}
+.live-indicator {
+    padding-right: 11px;
+    color: var(--green);
+    font-size: 9px;
+    letter-spacing: .08em;
+}
+.log-search {
+    max-width: 340px;
+    min-height: 31px;
+}
+.log-search::placeholder, .assistant-input::placeholder { color: #4f5d70; }
+.console-body { padding: 13px; }
+.logs-box {
+    height: 420px;
+    padding: 14px 15px;
+    border-radius: 11px;
+    background:
+        radial-gradient(700px 300px at 20% 0%, rgba(57,230,161,.025), transparent 60%),
+        #05080e;
+    border-color: rgba(148,163,184,.11);
+    color: #9fdb75;
+    box-shadow: inset 0 1px 12px rgba(0,0,0,.22);
+}
+
+/* Environment */
+.env-table-wrapper {
+    border-radius: 11px;
+    border-color: var(--border);
+}
+.env-table th, .env-table td {
+    padding: 11px 14px;
+    border-bottom-color: rgba(148,163,184,.09);
+}
+.env-table th {
+    background: rgba(255,255,255,.025);
+    color: #657287;
+    font-size: 9px;
+    letter-spacing: .1em;
+}
+.env-table td { color: #a8b3c4; }
+
+/* File explorer */
+.file-list { gap: 5px; margin-top: 2px; }
+.file-item {
+    min-height: 39px;
+    padding: 8px 12px;
+    border-radius: 9px;
+    border-color: rgba(148,163,184,.10);
+    background: rgba(255,255,255,.018);
+    transition: background .15s ease, border-color .15s ease, transform .15s ease;
+}
+.file-item:hover {
+    background: rgba(56,189,248,.045);
+    border-color: rgba(56,189,248,.16);
+    transform: translateX(2px);
+}
+.file-icon { color: var(--accent); }
+
+/* Assistant */
+.assistant-chat {
+    height: 560px;
+    border: 1px solid rgba(148,163,184,.10);
+    border-radius: 13px;
+    background: rgba(6,10,16,.55);
+}
+.assistant-sidebar {
+    width: 248px;
+    min-width: 248px;
+    background: rgba(10,15,23,.86);
+    border-right-color: var(--border);
+}
+.assistant-sidebar.collapsed {
+    width: 52px;
+    min-width: 52px;
+}
+.assistant-sidebar-header {
+    padding: 11px 12px;
+    border-bottom-color: var(--border);
+}
+.assistant-sidebar-title { color: #68758a; font-size: 9px; letter-spacing: .12em; }
+.assistant-sidebar-toggle {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: rgba(255,255,255,.025);
+    border-color: rgba(148,163,184,.13);
+}
+.assistant-session-list { padding: 7px; }
+.assistant-session-item {
+    min-height: 35px;
+    padding: 7px 7px 7px 10px;
+    margin-bottom: 3px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    color: #8491a4;
+    transition: background .14s ease, border-color .14s ease, color .14s ease;
+}
+.assistant-session-item:hover {
+    background: rgba(255,255,255,.035);
+    border-color: rgba(148,163,184,.08);
+}
+.assistant-session-item.active {
+    color: #78d5ff;
+    background: rgba(56,189,248,.08);
+    border-color: rgba(56,189,248,.12);
+}
+.assistant-sidebar-footer { padding: 9px 11px; }
+.assistant-main {
+    background: linear-gradient(180deg, rgba(255,255,255,.008), transparent);
+}
+.assistant-model-strip {
+    min-height: 37px;
+    padding: 8px 12px;
+    margin: 0;
+    border-bottom: 1px solid rgba(148,163,184,.08);
+}
+.assistant-model-label { color: #59677a; font-size: 9px; }
+.assistant-model-value { color: #91a0b3; }
+.assistant-messages {
+    height: auto;
+    margin: 11px 12px 0;
+    padding: 15px;
+    border-radius: 12px;
+    background:
+        radial-gradient(500px 300px at 75% 0%, rgba(56,189,248,.025), transparent 65%),
+        #05080e;
+    border-color: rgba(148,163,184,.10);
+}
+.assistant-message {
+    padding: 10px 12px;
+    border-radius: 11px;
+    line-height: 1.55;
+    box-shadow: 0 2px 12px rgba(0,0,0,.08);
+}
+.assistant-message.user {
+    background: linear-gradient(135deg, rgba(56,189,248,.13), rgba(56,189,248,.07));
+    border-color: rgba(56,189,248,.20);
+}
+.assistant-message.assistant {
+    background: rgba(255,255,255,.035);
+    border-color: rgba(148,163,184,.11);
+}
+.assistant-composer {
+    padding: 10px 12px 11px;
+    gap: 9px;
+}
+.assistant-input {
+    min-height: 44px;
+    border-radius: 11px;
+    padding: 11px 13px;
+    box-shadow: inset 0 1px 8px rgba(0,0,0,.16);
+}
+.assistant-composer #assistant-send {
+    min-width: 88px;
+    border-radius: 10px;
+}
+
+/* Toasts */
+.toast-container { right: 24px; bottom: 24px; }
+.toast {
+    padding: 11px 14px;
+    border-radius: 11px;
+    background: rgba(15,22,34,.94);
+    border-color: rgba(148,163,184,.18);
+    box-shadow: 0 18px 50px rgba(0,0,0,.35);
+    backdrop-filter: blur(16px);
+}
+
+/* Focus */
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible {
+    box-shadow: 0 0 0 2px #070a10, 0 0 0 4px rgba(85,199,255,.55) !important;
+}
+
+/* Subtle entrance */
+.header, .metric-card, .bot-card, .console {
+    animation: surface-in .45s ease both;
+}
+.metric-card:nth-child(2) { animation-delay: .035s; }
+.metric-card:nth-child(3) { animation-delay: .07s; }
+.metric-card:nth-child(4) { animation-delay: .105s; }
+.bot-card:nth-child(2) { animation-delay: .07s; }
+@keyframes surface-in {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+    .app { padding: 22px 20px 36px; }
+    .header { align-items: flex-start; }
+    .header-meta { justify-content: flex-end; }
+}
+@media (max-width: 760px) {
+    .app { padding: 14px 12px 28px; }
+    .header {
+        flex-direction: column;
+        gap: 13px;
+        padding: 13px;
+        border-radius: 16px;
+    }
+    .header-meta { width: 100%; justify-content: flex-start; }
+    .header-meta .btn { flex: 1; }
+    .system-pill { flex: 0 0 auto; }
+    .metrics { grid-template-columns: 1fr 1fr; }
+    .console-header { align-items: stretch; flex-direction: column; }
+    .console-tabs { overflow-x: auto; }
+    .console-right { width: 100%; }
+    .bot-select { width: 100%; }
+    .assistant-sidebar { width: 190px; min-width: 190px; }
+}
+@media (max-width: 520px) {
+    .metrics { grid-template-columns: 1fr; }
+    .bot-grid { grid-template-columns: 1fr; }
+    .bot-actions { flex-wrap: wrap; }
+    .bot-actions .btn { flex: 1 1 30%; }
+    .console-tabs .tab-btn { white-space: nowrap; }
+    .assistant-chat { height: 620px; }
+    .assistant-sidebar { width: 52px; min-width: 52px; }
+    .assistant-sidebar-title,
+    .assistant-sidebar .assistant-session-list,
+    .assistant-sidebar .assistant-sidebar-divider,
+    .assistant-sidebar .assistant-settings-panel,
+    .assistant-sidebar-footer .btn-start { display: none !important; }
+    .assistant-sidebar-header { justify-content: center; padding: 10px 0; }
+    .assistant-sidebar-rail-btn { display: grid; }
+}
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+    }
+}
+</style>
+
+
+<style id="design-polish-v2">
+/* --- Bot action color language --- */
+.btn-start {
+  --btn-accent: #34d399;
+  border-color: rgba(52, 211, 153, .35) !important;
+  background: rgba(52, 211, 153, .10) !important;
+  color: #6ee7b7 !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+}
+.btn-start:hover,
+.btn-start:focus-visible {
+  border-color: rgba(52, 211, 153, .65) !important;
+  background: rgba(52, 211, 153, .18) !important;
+  color: #a7f3d0 !important;
+  box-shadow: 0 0 24px rgba(52, 211, 153, .14);
+}
+
+.btn-restart {
+  --btn-accent: #fbbf24;
+  border-color: rgba(251, 191, 36, .35) !important;
+  background: rgba(251, 191, 36, .10) !important;
+  color: #fcd34d !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+}
+.btn-restart:hover,
+.btn-restart:focus-visible {
+  border-color: rgba(251, 191, 36, .65) !important;
+  background: rgba(251, 191, 36, .18) !important;
+  color: #fde68a !important;
+  box-shadow: 0 0 24px rgba(251, 191, 36, .14);
+}
+
+.btn-stop {
+  --btn-accent: #fb7185;
+  border-color: rgba(251, 113, 133, .38) !important;
+  background: rgba(251, 113, 133, .10) !important;
+  color: #fda4af !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+}
+.btn-stop:hover,
+.btn-stop:focus-visible {
+  border-color: rgba(251, 113, 133, .68) !important;
+  background: rgba(251, 113, 133, .18) !important;
+  color: #fecdd3 !important;
+  box-shadow: 0 0 24px rgba(251, 113, 133, .14);
+}
+
+/* --- Assistant send/stop button --- */
+.assistant-send-btn {
+  border-color: rgba(52, 211, 153, .42) !important;
+  background: rgba(52, 211, 153, .14) !important;
+  color: #6ee7b7 !important;
+}
+.assistant-send-btn:hover,
+.assistant-send-btn:focus-visible {
+  border-color: rgba(52, 211, 153, .72) !important;
+  background: rgba(52, 211, 153, .22) !important;
+  color: #a7f3d0 !important;
+  box-shadow: 0 0 26px rgba(52, 211, 153, .16);
+}
+.assistant-send-btn.is-stop,
+.assistant-send-btn.stop,
+.assistant-send-btn[data-state="stop"] {
+  border-color: rgba(251, 113, 133, .50) !important;
+  background: rgba(251, 113, 133, .15) !important;
+  color: #fda4af !important;
+}
+.assistant-send-btn.is-stop:hover,
+.assistant-send-btn.stop:hover,
+.assistant-send-btn[data-state="stop"]:hover {
+  border-color: rgba(251, 113, 133, .75) !important;
+  background: rgba(251, 113, 133, .23) !important;
+  color: #fecdd3 !important;
+  box-shadow: 0 0 26px rgba(251, 113, 133, .16);
+}
+
+/* If the existing JS changes the label to Stop but doesn't toggle a class,
+   style it by text through the button's state attribute when available.
+   JS below also guarantees the class is toggled. */
+
+/* --- Assistant model status --- */
+.assistant-model-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+.assistant-model-status {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 24px;
+  padding: 4px 9px;
+  border: 1px solid rgba(52, 211, 153, .20);
+  border-radius: 999px;
+  background: rgba(52, 211, 153, .055);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .11em;
+  line-height: 1;
+  white-space: nowrap;
+  color: #6ee7b7;
+}
+.model-status-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 7px rgba(52, 211, 153, .90), 0 0 15px rgba(52, 211, 153, .48);
+  animation: model-status-pulse 1.8s ease-in-out infinite;
+}
+@keyframes model-status-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .62; transform: scale(.86); }
+}
+.assistant-model-status.is-error,
+.assistant-model-status.is-offline,
+.assistant-model-status.is-disconnected {
+  border-color: rgba(251, 113, 133, .24);
+  background: rgba(251, 113, 133, .06);
+  color: #fda4af;
+}
+.assistant-model-status.is-error .model-status-dot,
+.assistant-model-status.is-offline .model-status-dot,
+.assistant-model-status.is-disconnected .model-status-dot {
+  background: #fb7185;
+  box-shadow: 0 0 7px rgba(251, 113, 133, .92), 0 0 15px rgba(251, 113, 133, .50);
+}
+.assistant-model-status.is-warning {
+  border-color: rgba(251, 191, 36, .24);
+  background: rgba(251, 191, 36, .06);
+  color: #fcd34d;
+}
+.assistant-model-status.is-warning .model-status-dot {
+  background: #fbbf24;
+  box-shadow: 0 0 7px rgba(251, 191, 36, .92), 0 0 15px rgba(251, 191, 36, .50);
+}
+
+/* --- Align activity bar with the assistant message pane --- */
+.assistant-activity {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box;
+  align-self: stretch;
+}
+.assistant-messages {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* --- Mobile assistant sidebar: allow it to overlay the chat instead of being
+   constrained by the narrow layout. --- */
+@media (max-width: 520px) {
+  .assistant-sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: min(88vw, 360px) !important;
+    max-width: none !important;
+    z-index: 1000 !important;
+    transform: translateX(-105%);
+    transition: transform .24s ease, box-shadow .24s ease;
+    box-shadow: 22px 0 60px rgba(0,0,0,.52), 0 0 0 1px rgba(255,255,255,.05);
+  }
+
+  .assistant-sidebar.expanded,
+  .assistant-sidebar.open,
+  .assistant-sidebar.is-open,
+  .assistant-sidebar[data-expanded="true"] {
+    transform: translateX(0);
+  }
+
+  .assistant-chat,
+  .assistant-messages,
+  .assistant-model-strip,
+  .assistant-composer {
+    position: relative;
+    z-index: 1;
+  }
+
+  .assistant-sidebar-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 999 !important;
+    background: rgba(2, 6, 23, .56);
+    backdrop-filter: blur(2px);
+  }
+}
+
+/* Keep the expanded mobile panel visible for common existing toggle classes. */
+@media (max-width: 520px) {
+  body:has(.assistant-sidebar.expanded) .assistant-sidebar,
+  body:has(.assistant-sidebar.open) .assistant-sidebar,
+  body:has(.assistant-sidebar.is-open) .assistant-sidebar,
+  body:has(.assistant-sidebar[data-expanded="true"]) .assistant-sidebar {
+    transform: translateX(0);
+  }
+}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -355,7 +1130,7 @@
             </div>
         </div>
         <div class="header-meta">
-            <button class="btn btn-restart" style="padding: 7px 12px;" onclick="redeployServer()">🔄 Redeploy Server</button>
+            <button class="btn btn-restart btn-start btn-stop assistant-send-btn" style="padding: 7px 12px;" onclick="redeployServer()">🔄 Redeploy Server</button>
             <a href="/logout" class="btn btn-stop" style="padding: 7px 12px;">🚪 Logout</a>
             <div class="system-pill">
                 <span id="connection-dot" class="system-dot"></span>
@@ -445,9 +1220,9 @@
                     <div class="bot-stat"><div class="stat-label">Restarts</div><div class="stat-value" id="restarts-love-whispers">0</div></div>
                 </div>
                 <div class="bot-actions">
-                    <button class="btn btn-start" onclick="controlBot('love-whispers', 'start')">▶ Start</button>
-                    <button class="btn btn-restart" onclick="controlBot('love-whispers', 'restart')">🔄 Restart</button>
-                    <button class="btn btn-stop" onclick="controlBot('love-whispers', 'stop')">⏹ Stop</button>
+                    <button class="btn btn-start" onclick="controlBot('love-whispers', 'start')">▶️ Start</button>
+                    <button class="btn btn-restart btn-start" onclick="controlBot('love-whispers', 'restart')">🔄 Restart</button>
+                    <button class="btn btn-stop" onclick="controlBot('love-whispers', 'stop')">⏹️ Stop</button>
                 </div>
             </article>
 
@@ -471,9 +1246,9 @@
                     <div class="bot-stat"><div class="stat-label">Restarts</div><div class="stat-value" id="restarts-packtogether">0</div></div>
                 </div>
                 <div class="bot-actions">
-                    <button class="btn btn-start" onclick="controlBot('packtogether', 'start')">▶ Start</button>
+                    <button class="btn btn-start btn-stop" onclick="controlBot('packtogether', 'start')">▶️ Start</button>
                     <button class="btn btn-restart" onclick="controlBot('packtogether', 'restart')">🔄 Restart</button>
-                    <button class="btn btn-stop" onclick="controlBot('packtogether', 'stop')">⏹ Stop</button>
+                    <button class="btn btn-stop" onclick="controlBot('packtogether', 'stop')">⏹️ Stop</button>
                 </div>
             </article>
         </div>
@@ -593,6 +1368,11 @@
                         <!-- RIGHT MAIN CHAT AREA -->
                         <div class="assistant-main">
                             <div class="assistant-model-strip" aria-live="polite">
+<div class="assistant-model-status" id="assistant-model-status" aria-live="polite">
+  <span class="model-status-dot" aria-hidden="true"></span>
+  <span class="model-status-text">READY</span>
+</div>
+
                                 <span class="assistant-model-label">Active model</span>
                                 <span id="assistant-status" class="assistant-model-value">Loading...</span>
                             </div>
@@ -1815,5 +2595,64 @@
     fetchStatus();
     fetchLogs();
 </script>
+
+<script id="design-polish-v2-js">
+(function () {
+  function setAssistantSendVisualState() {
+    const btn = document.querySelector('.assistant-send-btn');
+    if (!btn) return;
+    const text = (btn.textContent || '').trim().toLowerCase();
+    const isStop = text.includes('stop') || btn.dataset.state === 'stop';
+    btn.classList.toggle('is-stop', isStop);
+    btn.dataset.state = isStop ? 'stop' : 'send';
+  }
+
+  function updateAssistantModelStatus(state, label) {
+    const el = document.getElementById('assistant-model-status');
+    if (!el) return;
+    el.classList.remove('is-error', 'is-offline', 'is-disconnected', 'is-warning');
+    const normalized = String(state || 'ready').toLowerCase();
+
+    if (['error', 'offline', 'disconnected', 'down', 'failed'].includes(normalized)) {
+      el.classList.add(normalized === 'offline' ? 'is-offline' :
+                      normalized === 'disconnected' ? 'is-disconnected' : 'is-error');
+      el.querySelector('.model-status-text').textContent = label || 'OFFLINE';
+    } else if (['warning', 'degraded', 'busy', 'loading'].includes(normalized)) {
+      el.classList.add('is-warning');
+      el.querySelector('.model-status-text').textContent = label || 'CHECKING';
+    } else {
+      el.querySelector('.model-status-text').textContent = label || 'READY';
+    }
+  }
+
+  window.updateAssistantModelStatus = updateAssistantModelStatus;
+
+  setAssistantSendVisualState();
+
+  const sendBtn = document.querySelector('.assistant-send-btn');
+  if (sendBtn) {
+    const observer = new MutationObserver(setAssistantSendVisualState);
+    observer.observe(sendBtn, { childList: true, characterData: true, subtree: true, attributes: true });
+  }
+
+  // If the existing page already exposes a model-health value on the assistant,
+  // reflect it without requiring changes to its API calls.
+  const modelStrip = document.querySelector('.assistant-model-strip');
+  if (modelStrip) {
+    const modelObserver = new MutationObserver(function () {
+      const text = (modelStrip.textContent || '').toLowerCase();
+      if (/\b(error|offline|disconnected|failed|unavailable|down)\b/.test(text)) {
+        updateAssistantModelStatus('error', 'OFFLINE');
+      } else if (/\b(connecting|loading|checking|busy)\b/.test(text)) {
+        updateAssistantModelStatus('warning', 'CHECKING');
+      } else {
+        updateAssistantModelStatus('ready', 'READY');
+      }
+    });
+    modelObserver.observe(modelStrip, { childList: true, characterData: true, subtree: true });
+  }
+})();
+</script>
+
 </body>
 </html>
