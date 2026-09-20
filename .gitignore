@@ -5,3 +5,4 @@
 *.pid
 .env
 __pycache__/
+linux-server.zip

@@ -270,6 +270,26 @@
             flex: 1; padding: 6px 8px; font-size: 11px; border-radius: 6px;
             background: #0a1019; border: 1px solid var(--border); color: var(--text-secondary);
         }
+        .model-combo { position: relative; flex: 1; min-width: 0; display: flex; }
+        .model-combo input { width: 100%; min-width: 0; }
+        .model-combo.has-options input { padding-right: 24px; }
+        .model-combo-toggle {
+            position: absolute; top: 1px; right: 1px; bottom: 1px; width: 22px; padding: 0;
+            border: 0; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 11px;
+        }
+        .model-combo-toggle:hover { color: var(--text); }
+        .model-combo-toggle[hidden] { display: none; }
+        .model-combo-list {
+            display: none; position: absolute; left: 0; right: 0; bottom: calc(100% + 4px);
+            max-height: 180px; overflow-y: auto; z-index: 10;
+            background: var(--panel-strong); border: 1px solid var(--border-light); border-radius: 6px; box-shadow: var(--shadow);
+        }
+        .model-combo-list.open { display: block; }
+        .model-combo-option { padding: 6px 8px; font-family: var(--mono); font-size: 10px; color: var(--text-secondary); cursor: pointer; word-break: break-all; }
+        .model-combo-option:hover, .model-combo-option.active { background: rgba(255,255,255,.06); color: var(--text); }
+        .model-combo-option.selected { color: var(--accent); }
+        .model-combo-empty { padding: 8px; font-size: 10px; color: var(--text-muted); }
+        .assistant-composer .btn:disabled { opacity: .4; cursor: not-allowed; }
         .assistant-settings-actions { display: flex; gap: 6px; margin-top: 8px; }
         .assistant-settings-status { font-size: 10px; color: var(--text-muted); margin-top: 6px; font-family: var(--mono); }
 
@@ -292,7 +312,7 @@
         .assistant-activity { min-height: 0px; padding-top: 4px; padding-bottom: 4px; color: var(--text-muted); font-family: var(--mono); font-size: 11px; flex-shrink: 0; }
         .assistant-composer { position: relative; padding-bottom: 2px; padding-top: 2px; display: flex; gap: 8px; flex-shrink: 0; }
         .assistant-input { flex: 1; min-height: 42px; resize: vertical; padding: 10px 12px; color: var(--text); background: #0a1019; border: 1px solid var(--border-light); border-radius: 7px; font-size: 12px; }
-        .assistant-suggestions { position: absolute; left: 0; right: 76px; bottom: calc(100% + 6px); display: none; max-height: 180px; overflow-y: auto; background: var(--panel-strong); border: 1px solid var(--border-light); border-radius: 7px; box-shadow: var(--shadow); z-index: 5; }
+        .assistant-suggestions { position: absolute; left: 0; right: 132px; bottom: calc(100% + 6px); display: none; max-height: 180px; overflow-y: auto; background: var(--panel-strong); border: 1px solid var(--border-light); border-radius: 7px; box-shadow: var(--shadow); z-index: 5; }
         .assistant-suggestion { padding: 8px 10px; color: var(--text-secondary); font-family: var(--mono); font-size: 11px; cursor: pointer; outline: none; }
         .assistant-suggestion:hover, .assistant-suggestion.selected { color: var(--text); background: rgba(255,255,255,.06); }
         .assistant-sidebar-toggle {
@@ -528,16 +548,20 @@
                                 <div class="assistant-settings-row">
                                     <select id="assistant-provider-select"></select>
                                 </div>
-                                <div class="assistant-settings-row">
+                                <div class="assistant-settings-row" id="assistant-base-url-row" style="display:none">
                                     <input id="assistant-base-url" type="url" placeholder="Base URL, e.g. https://router.example/v1">
                                 </div>
                                 <div class="assistant-settings-row">
                                     <input id="assistant-api-key" type="password" placeholder="API Key or Token">
                                 </div>
                                 <div class="assistant-settings-row">
-                                    <input id="assistant-model" list="assistant-model-options" type="text" placeholder="Model ID">
-                                    <datalist id="assistant-model-options"></datalist>
-                                    <button class="btn" onclick="fetchAssistantModels()">↻ Fetch</button>
+                                    <div class="model-combo" id="assistant-model-combo">
+                                        <input id="assistant-model" type="text" placeholder="Model ID" autocomplete="off" spellcheck="false"
+                                               role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="assistant-model-list">
+                                        <button type="button" class="model-combo-toggle" id="assistant-model-toggle" tabindex="-1" aria-label="Show fetched models" hidden>▾</button>
+                                        <div class="model-combo-list" id="assistant-model-list" role="listbox"></div>
+                                    </div>
+                                    <button class="btn" id="assistant-fetch-btn" type="button" onclick="fetchAssistantModels()">↻ Fetch</button>
                                 </div>
                                 <div class="assistant-settings-actions">
                                     <button class="btn btn-start" onclick="saveAssistantProvider()">Save & Restart Hermes</button>
@@ -566,6 +590,7 @@
                             <div class="assistant-composer">
                                 <div id="assistant-suggestions" class="assistant-suggestions"></div>
                                 <textarea id="assistant-input" class="assistant-input" rows="2" placeholder="Ask Hermes to inspect or manage the server..."></textarea>
+                                <button class="btn btn-stop" id="assistant-stop" type="button" onclick="stopAssistant()" title="Stop response" disabled>■</button>
                                 <button class="btn btn-start" onclick="sendAssistantMessage()">➤</button>
                             </div>
                         </div>
@@ -935,23 +960,66 @@
     }
 
     // Provider settings panel
+    function setAssistantStopEnabled(enabled) {
+        const button = document.getElementById('assistant-stop');
+        if (button) button.disabled = !enabled;
+    }
+
+    // Fallback list (ids must match PROVIDERS in assistant_settings.py); replaced by the server list once loaded.
+    const ASSISTANT_PROVIDER_FALLBACK = [
+        { id: 'openrouter', name: 'OpenRouter' },
+        { id: 'openai', name: 'OpenAI' },
+        { id: 'anthropic', name: 'Anthropic' },
+        { id: 'gemini', name: 'Gemini' },
+        { id: 'xai', name: 'xAI' },
+        { id: 'deepseek', name: 'DeepSeek' },
+        { id: 'groq', name: 'Groq' },
+        { id: 'copilot', name: 'GitHub Copilot' },
+        { id: 'ninerouter', name: '9Router' },
+        { id: 'custom', name: 'Custom OpenAI-Compatible' }
+    ];
+    let assistantProviders = ASSISTANT_PROVIDER_FALLBACK;
+    let assistantModelOptions = [];
+    let assistantModelActive = -1;
+
+    function renderProviderOptions(providers, selected) {
+        const select = document.getElementById('assistant-provider-select');
+        const current = selected || select.value;
+        select.innerHTML = '';
+        providers.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.id === 'custom' ? 'Custom OpenAI-Compatible' : p.name;
+            select.appendChild(opt);
+        });
+        if (current && providers.some(p => p.id === current)) select.value = current;
+    }
+
+    // Base URL is only editable for the custom provider; every other provider uses a fixed endpoint.
+    function updateProviderFields() {
+        const provider = document.getElementById('assistant-provider-select').value;
+        document.getElementById('assistant-base-url-row').style.display = provider === 'custom' ? 'flex' : 'none';
+        const entry = assistantProviders.find(p => p.id === provider);
+        document.getElementById('assistant-api-key').placeholder =
+            entry && entry.key_configured ? 'API key saved - leave blank to keep' : 'API Key or Token';
+    }
+
+    function onAssistantProviderChange() {
+        const baseInput = document.getElementById('assistant-base-url');
+        const known = assistantProviders.map(p => p.base_url).filter(Boolean);
+        if (known.includes(baseInput.value.trim())) baseInput.value = '';
+        setModelOptions([]);
+        updateProviderFields();
+    }
+
     function toggleProviderPanel() {
         const panel = document.getElementById('assistant-settings-panel');
         panel.classList.toggle('open');
         const footerBtns = document.querySelector('.assistant-sidebar-footer');
         footerBtns.style.display = panel.classList.contains('open') ? 'none' : 'flex';
-        // Populate provider select
         const select = document.getElementById('assistant-provider-select');
-        if (select.options.length <= 1) {
-            const providers = ['OpenRouter', 'OpenAI', 'Anthropic', 'Gemini', 'XAI', 'DeepSeek', 'Groq', 'Copilot', '9Router', 'Custom OpenAI-Compatible'];
-            providers.forEach(p => {
-                const opt = document.createElement('option');
-                opt.value = p;
-                opt.textContent = p.charAt(0).toUpperCase() + p.slice(1);
-                select.appendChild(opt);
-            });
-        }
-        // Load current settings
+        if (select.options.length === 0) renderProviderOptions(assistantProviders);
+        updateProviderFields();
         loadCurrentSettings();
     }
 
@@ -959,37 +1027,172 @@
         const panel = document.getElementById('assistant-settings-panel');
         panel.classList.remove('open');
         document.querySelector('.assistant-sidebar-footer').style.display = 'flex';
+        closeModelList();
     }
 
     async function loadCurrentSettings() {
         try {
             const res = await fetch('/api/assistant/settings');
             const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Could not load settings');
             if (data.csrf_token) {
                 sessionStorage.setItem('assistant_csrf', data.csrf_token);
             }
-            if (data.provider) {
+            if (Array.isArray(data.providers) && data.providers.length) {
+                assistantProviders = data.providers;
+                renderProviderOptions(assistantProviders, data.provider);
+            } else if (data.provider) {
                 document.getElementById('assistant-provider-select').value = data.provider;
             }
-            if (data.base_url) {
-                document.getElementById('assistant-base-url').value = data.base_url;
-            }
+            document.getElementById('assistant-base-url').value = data.provider === 'custom' ? (data.base_url || '') : '';
             if (data.model) {
                 document.getElementById('assistant-model').value = data.model;
             }
+            updateProviderFields();
             // api_key not shown for security
         } catch (e) {
             console.error("Load settings error", e);
         }
     }
 
-    async function loadAssistantSettings() {
-        // Placeholder: refresh fields when provider changes
+    // ---- Model ID combobox: free-typing input plus a dropdown of fetched models ----
+    function setModelOptions(models) {
+        assistantModelOptions = Array.isArray(models) ? models : [];
+        const has = assistantModelOptions.length > 0;
+        document.getElementById('assistant-model-combo').classList.toggle('has-options', has);
+        document.getElementById('assistant-model-toggle').hidden = !has;
+        if (has) renderModelList(false); else closeModelList();
+    }
+
+    function renderModelList(filter) {
+        const list = document.getElementById('assistant-model-list');
+        const input = document.getElementById('assistant-model');
+        const value = input.value.trim();
+        const query = filter ? value.toLowerCase() : '';
+        const matches = assistantModelOptions.filter(id => !query || id.toLowerCase().includes(query));
+        list.innerHTML = '';
+        assistantModelActive = -1;
+        matches.forEach(id => {
+            const item = document.createElement('div');
+            item.className = 'model-combo-option' + (id === value ? ' selected' : '');
+            item.setAttribute('role', 'option');
+            item.textContent = id;
+            item.onmousedown = event => { event.preventDefault(); chooseModel(id); };
+            list.appendChild(item);
+        });
+        if (!matches.length) {
+            const empty = document.createElement('div');
+            empty.className = 'model-combo-empty';
+            empty.textContent = 'No matching models - your typed ID will be used as-is.';
+            list.appendChild(empty);
+        }
+    }
+
+    function openModelList(filter) {
+        if (!assistantModelOptions.length) return;
+        renderModelList(filter);
+        document.getElementById('assistant-model-list').classList.add('open');
+        document.getElementById('assistant-model').setAttribute('aria-expanded', 'true');
+        const selected = document.querySelector('#assistant-model-list .model-combo-option.selected');
+        if (selected) selected.scrollIntoView({ block: 'nearest' });
+    }
+
+    function closeModelList() {
+        const list = document.getElementById('assistant-model-list');
+        if (list) list.classList.remove('open');
+        const input = document.getElementById('assistant-model');
+        if (input) input.setAttribute('aria-expanded', 'false');
+        assistantModelActive = -1;
+    }
+
+    function chooseModel(id) {
+        document.getElementById('assistant-model').value = id;
+        closeModelList();
+    }
+
+    function moveModelHighlight(step) {
+        const items = document.querySelectorAll('#assistant-model-list .model-combo-option');
+        if (!items.length) return;
+        items.forEach(item => item.classList.remove('active'));
+        assistantModelActive = (assistantModelActive + step + items.length) % items.length;
+        items[assistantModelActive].classList.add('active');
+        items[assistantModelActive].scrollIntoView({ block: 'nearest' });
+    }
+
+    (function initModelCombo() {
+        const input = document.getElementById('assistant-model');
+        const list = document.getElementById('assistant-model-list');
+        input.addEventListener('focus', () => openModelList(false));
+        input.addEventListener('click', () => { if (!list.classList.contains('open')) openModelList(false); });
+        input.addEventListener('input', () => openModelList(true));
+        input.addEventListener('keydown', event => {
+            const isOpen = list.classList.contains('open');
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                if (!assistantModelOptions.length) return;
+                event.preventDefault();
+                if (!isOpen) openModelList(false);
+                moveModelHighlight(event.key === 'ArrowDown' ? 1 : -1);
+            } else if (event.key === 'Enter' && isOpen && assistantModelActive >= 0) {
+                event.preventDefault();
+                const active = list.querySelectorAll('.model-combo-option')[assistantModelActive];
+                if (active) chooseModel(active.textContent);
+            } else if (event.key === 'Escape' && isOpen) {
+                event.preventDefault();
+                closeModelList();
+            }
+        });
+        document.getElementById('assistant-model-toggle').addEventListener('mousedown', event => {
+            event.preventDefault();
+            if (list.classList.contains('open')) closeModelList();
+            else { input.focus(); openModelList(false); }
+        });
+        document.addEventListener('mousedown', event => {
+            if (!document.getElementById('assistant-model-combo').contains(event.target)) closeModelList();
+        });
+    })();
+
+    async function fetchAssistantModels() {
+        const provider = document.getElementById('assistant-provider-select').value;
+        const baseUrl = document.getElementById('assistant-base-url').value.trim();
+        const apiKey = document.getElementById('assistant-api-key').value.trim();
+        const statusEl = document.getElementById('assistant-settings-status');
+        const button = document.getElementById('assistant-fetch-btn');
+        if (provider === 'custom' && !baseUrl) {
+            statusEl.innerText = 'Enter a base URL first';
+            document.getElementById('assistant-base-url').focus();
+            return;
+        }
+        button.disabled = true;
+        button.textContent = 'Fetching...';
+        statusEl.innerText = 'Fetching models...';
+        try {
+            const res = await fetch('/api/assistant/models', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider, base_url: provider === 'custom' ? baseUrl : '', api_key: apiKey })
+            });
+            const data = await readAssistantJson(res, 'Model fetch failed');
+            if (!res.ok) throw new Error(data.error || 'Model fetch failed');
+            const models = Array.isArray(data.models) ? data.models : [];
+            setModelOptions(models);
+            statusEl.innerText = models.length ? `Loaded ${models.length} models - pick one or type your own` : 'Provider returned no models';
+            if (models.length) {
+                const input = document.getElementById('assistant-model');
+                input.focus();
+                openModelList(false);
+            }
+        } catch (error) {
+            statusEl.innerText = error.message;
+            showToast(error.message, 'error');
+        } finally {
+            button.disabled = false;
+            button.textContent = '↻ Fetch';
+        }
     }
 
     async function saveAssistantProvider() {
         const provider = document.getElementById('assistant-provider-select').value;
-        const baseUrl = document.getElementById('assistant-base-url').value.trim();
+        const baseUrl = provider === 'custom' ? document.getElementById('assistant-base-url').value.trim() : '';
         const apiKey = document.getElementById('assistant-api-key').value.trim();
         const model = document.getElementById('assistant-model').value.trim();
         const statusEl = document.getElementById('assistant-settings-status');
@@ -1037,7 +1240,7 @@
         const assistantMessage = { role: 'assistant', content: 'Sending to Hermes...' };
         assistantMessages.push(assistantMessage);
         renderAssistantMessages();
-        document.getElementById('assistant-stop').disabled = false;
+        setAssistantStopEnabled(true);
         document.getElementById('assistant-activity').innerText = 'Message received';
         assistantAbort = new AbortController();
         assistantRequestId = crypto.randomUUID();
@@ -1114,12 +1317,15 @@
             if (e.name !== 'AbortError') {
                 assistantMessage.content = `Assistant error: ${e.message}`;
                 renderAssistantMessages();
+            } else if (!responseStarted) {
+                assistantMessage.content = 'Stopped.';
+                renderAssistantMessages();
             }
         } finally {
             clearTimeout(statusTimer);
             assistantAbort = null;
             assistantRequestId = '';
-            document.getElementById('assistant-stop').disabled = true;
+            setAssistantStopEnabled(false);
         }
     }
 
@@ -1155,7 +1361,7 @@
             document.getElementById('assistant-activity').innerText = 'Command failed';
         } finally {
             renderAssistantMessages();
-            document.getElementById('assistant-stop').disabled = true;
+            setAssistantStopEnabled(false);
             // Persist session ID if present in response
             if (data.session_id) {
                 sessionStorage.setItem('assistant_session_id', data.session_id);
@@ -1222,7 +1428,7 @@
         }
         if (assistantAbort) assistantAbort.abort();
         assistantAbort = null;
-        document.getElementById('assistant-stop').disabled = true;
+        setAssistantStopEnabled(false);
         document.getElementById('assistant-activity').innerText = 'Stopped';
     }
 
@@ -1318,7 +1524,7 @@
         }
     });
 
-    document.getElementById('assistant-provider-select').addEventListener('change', loadAssistantSettings);
+    document.getElementById('assistant-provider-select').addEventListener('change', onAssistantProviderChange);
 
     async function controlBot(bot, action) {
         try {

@@ -222,8 +222,10 @@ def login_required(f):
 
 try:
     from .assistant import create_assistant_blueprint
+    from .assistant_settings import PROVIDERS as SETTINGS_PROVIDERS
 except ImportError:
     from assistant import create_assistant_blueprint
+    from assistant_settings import PROVIDERS as SETTINGS_PROVIDERS
 
 app.register_blueprint(create_assistant_blueprint(login_required))
 
@@ -557,26 +559,71 @@ def configure_assistant_provider():
         return jsonify({"error": f"Provider saved but Hermes could not restart: {error}"}), 503
     return jsonify({"success": True, "provider": provider, "restarted": True})
 
+def build_model_list_headers(base_url, api_key):
+    headers = {"Accept": "application/json"}
+    host = (urlparse(base_url).hostname or "").lower()
+    if host.endswith("anthropic.com"):
+        if api_key:
+            headers["x-api-key"] = api_key
+        headers["anthropic-version"] = "2023-06-01"
+    elif host.endswith("googleapis.com"):
+        if api_key:
+            headers["x-goog-api-key"] = api_key
+    elif api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    return headers
+
+def extract_model_ids(data):
+    items = data.get("data") if isinstance(data, dict) else data
+    if not isinstance(items, list) and isinstance(data, dict):
+        items = data.get("models")
+    if not isinstance(items, list):
+        return []
+    models = []
+    for item in items:
+        model_id = item if isinstance(item, str) else (item.get("id") or item.get("name")) if isinstance(item, dict) else None
+        if not isinstance(model_id, str) or not model_id.strip():
+            continue
+        model_id = model_id.strip()
+        if model_id.startswith("models/"):
+            model_id = model_id[len("models/"):]
+        if model_id not in models:
+            models.append(model_id)
+    return models
+
 @app.route("/api/assistant/models", methods=["POST"])
 @login_required
 def fetch_assistant_models():
     payload = request.get_json(silent=True) or {}
-    base_url = payload.get("base_url", "").strip().rstrip("/")
+    provider = payload.get("provider", "")
+    base_url = payload.get("base_url", "")
     api_key = payload.get("api_key", "")
-    if not valid_provider_url(base_url):
-        return jsonify({"error": "Enter a valid HTTP or HTTPS provider URL"}), 400
+    if not isinstance(base_url, str) or not isinstance(provider, str):
+        return jsonify({"error": "Invalid request"}), 400
     if not isinstance(api_key, str) or len(api_key) > 5000 or "\n" in api_key or "\r" in api_key:
         return jsonify({"error": "Provider key is invalid"}), 400
+    base_url = base_url.strip().rstrip("/")
+    api_key = api_key.strip()
+
+    # Built-in providers use their fixed endpoint. A saved key is only reused for those
+    # fixed endpoints, never forwarded to a user-supplied custom URL.
+    known = SETTINGS_PROVIDERS.get(provider)
+    if known and provider != "custom":
+        base_url = known[2].rstrip("/")
+        if not api_key:
+            api_key = read_hermes_env().get(known[1], "").strip().strip("\"'")
+    if not valid_provider_url(base_url):
+        return jsonify({"error": "Enter a valid HTTP or HTTPS provider URL"}), 400
     try:
         response = requests.get(
             f"{base_url}/models",
-            headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
+            headers=build_model_list_headers(base_url, api_key),
             timeout=15
         )
         if not response.ok:
-            return jsonify({"error": f"Provider returned HTTP {response.status_code}"}), 502
-        data = response.json()
-        models = [item.get("id") for item in data.get("data", []) if isinstance(item, dict) and item.get("id")]
+            hint = " - check the API key" if response.status_code in (401, 403) else ""
+            return jsonify({"error": f"Provider returned HTTP {response.status_code}{hint}"}), 502
+        models = extract_model_ids(response.json())
         return jsonify({"models": models[:500]})
     except (requests.RequestException, ValueError):
         return jsonify({"error": "Could not fetch models from provider"}), 502
