@@ -1034,7 +1034,7 @@
         if (!reuseLastUserMessage) {
             assistantMessages.push({ role: 'user', content });
         }
-        const assistantMessage = { role: 'assistant', content: 'Waking Hermes up...' };
+        const assistantMessage = { role: 'assistant', content: 'Sending to Hermes...' };
         assistantMessages.push(assistantMessage);
         renderAssistantMessages();
         document.getElementById('assistant-stop').disabled = false;

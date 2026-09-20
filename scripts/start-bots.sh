@@ -12,6 +12,17 @@ NINEROUTER_HOME_DIR="$HOME/.9router"
 LOVE_WHISPERS_DIR="$BOT_DIR/love-whispers-bot"
 PACKTOGETHER_DIR="$BOT_DIR/PackTogether"
 
+notify_status_failure() {
+    local MESSAGE="$1"
+    if [ -n "${STATUS_BOT_TOKEN:-}" ] && [ -n "${STATUS_CHAT_ID:-}" ]; then
+        curl -sS --max-time 15 -X POST \
+            "https://api.telegram.org/bot${STATUS_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${STATUS_CHAT_ID}" \
+            --data-urlencode "text=${MESSAGE}" \
+            --data-urlencode "parse_mode=HTML" >/dev/null 2>&1 || true
+    fi
+}
+
 echo "======================================"
 echo "Starting bots, Panel, Cloudflare Tunnel, and private Tailscale SSH"
 echo "======================================"
@@ -72,10 +83,12 @@ export HERMES_API_SERVER_KEY="$API_SERVER_KEY"
 
 if [ -z "$API_SERVER_KEY" ]; then
     echo "ERROR: HERMES_API_SERVER_KEY is not configured."
+    notify_status_failure "<b>Hermes startup failed</b> - API_SERVER_KEY is not configured."
     exit 1
 fi
 if ! command -v hermes >/dev/null 2>&1; then
     echo "ERROR: Hermes Agent is not installed."
+    notify_status_failure "<b>Hermes startup failed</b> - Hermes Agent is not installed."
     exit 1
 fi
 
@@ -95,6 +108,7 @@ for i in {1..30}; do
     if ! kill -0 "$HERMES_PID" 2>/dev/null; then
         echo "ERROR: Hermes exited during startup."
         tail -n 40 /tmp/hermes.log || true
+        notify_status_failure "<b>Hermes startup failed</b> - Gateway exited before the API became ready. See /tmp/hermes.log in the workflow artifact."
         exit 1
     fi
     sleep 1
@@ -102,6 +116,7 @@ done
 if [ "$HERMES_READY" != "true" ]; then
     echo "ERROR: Hermes API did not become ready within 30 seconds."
     tail -n 40 /tmp/hermes.log || true
+    notify_status_failure "<b>Hermes startup timeout</b> - The API did not become ready within 30 seconds. See /tmp/hermes.log in the workflow artifact."
     exit 1
 fi
 echo "Hermes Agent PID: $HERMES_PID (API 127.0.0.1:8642)"
@@ -111,6 +126,7 @@ echo
 echo "==> Starting Hermes Telegram bridge"
 if [ -z "${HERMES_TELEGRAM_BOT_TOKEN:-}" ]; then
     echo "ERROR: HERMES_TELEGRAM_BOT_TOKEN is not configured."
+    notify_status_failure "<b>Hermes bridge startup failed</b> - HERMES_TELEGRAM_BOT_TOKEN is not configured."
     exit 1
 fi
 cd "$PANEL_DIR"
@@ -127,6 +143,7 @@ sleep 2
 if ! kill -0 "$HERMES_TELEGRAM_PID" 2>/dev/null; then
     echo "ERROR: Hermes Telegram bridge exited during startup."
     tail -n 40 /tmp/hermes-telegram.log || true
+    notify_status_failure "<b>Hermes bridge startup failed</b> - Telegram bridge exited during startup. See /tmp/hermes-telegram.log in the workflow artifact."
     exit 1
 fi
 

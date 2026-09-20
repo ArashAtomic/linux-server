@@ -75,6 +75,10 @@ STATUS_LOVE=$(bot_status_plain "❤️ Love Whispers" "/tmp/love-whispers.pid")
 STATUS_PACK=$(bot_status_plain "🎒 PackTogether" "/tmp/packtogether.pid")
 CPU_INFO=$(get_cpu)
 RAM_INFO=$(get_memory)
+HERMES_STATUS="🔴 Hermes API: UNAVAILABLE"
+if curl -fsS --max-time 3 http://127.0.0.1:8642/health >/dev/null 2>&1; then
+    HERMES_STATUS="🟢 Hermes API: READY"
+fi
 
 TELEGRAM_MSG="<b>🚀 BOT SERVER IS ONLINE</b>
 
@@ -87,6 +91,7 @@ TELEGRAM_MSG="<b>🚀 BOT SERVER IS ONLINE</b>
 <b>🤖 Bot Status</b>
 ${STATUS_LOVE}
 ${STATUS_PACK}
+${HERMES_STATUS}
 
 <b>📊 System Resources</b>
 CPU load: ${CPU_INFO}
@@ -101,6 +106,7 @@ PLAIN_MSG="==================================================
   🤖 Bot Status:
     ${STATUS_LOVE}
     ${STATUS_PACK}
+        ${HERMES_STATUS}
   ------------------------------------------------
   📊 System Resources:
     CPU load: ${CPU_INFO}
