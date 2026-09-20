@@ -89,6 +89,15 @@ hermes --version
 mkdir -p "$HERMES_HOME_DIR"
 chmod 700 "$HERMES_HOME_DIR"
 
+# Operator context: SOUL.md is Hermes' agent identity (system prompt slot #1). It is installed from the
+# repository on every boot so the repo stays the source of truth and the cached copy cannot go stale.
+echo "==> Installing Hermes operator context (SOUL.md)"
+if [ -f ./hermes/SOUL.md ]; then
+    install -m 600 ./hermes/SOUL.md "$HERMES_HOME_DIR/SOUL.md"
+else
+    echo "WARNING: hermes/SOUL.md not found; Hermes keeps its default identity."
+fi
+
 echo
 echo "==> Preparing 9Router data directory"
 if [ ! -f "$NINEROUTER_HOME_DIR/.env" ]; then

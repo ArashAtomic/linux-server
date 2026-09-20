@@ -52,7 +52,7 @@ repository/
     ```
   - Prompts for your `SERVER_PASSWORD` in the terminal before granting shell access.
 - **Interactive Telegram Bot Commands**:
-  - On boot, sends the Web Panel URL and the exact SSH command to your Telegram status chat.
+  - On boot, sends the Web Panel URL and the SSH command to your Telegram status chat. The startup message's command includes a `-L 20129:127.0.0.1:20128` forward, so the loopback-only 9Router dashboard opens at `http://localhost:20129/dashboard` while that SSH session is connected. `/ssh` and the panel's SSH card still show the plain command.
   - `🔄 /redeploy` or `/restart` - Trigger a fresh GitHub Actions workflow run and update the server instantly.
   - `📊 /status` - Real-time CPU/RAM stats and bot health.
   - `🌐 /panel` - Direct link to the Web Management Panel.

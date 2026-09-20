@@ -65,10 +65,23 @@ if [ -s /tmp/panel_url.txt ]; then
     PANEL_URL=$(cat /tmp/panel_url.txt)
 fi
 
+# The startup message advertises the SSH command with a port forward to the loopback-only 9Router
+# dashboard. Local port 20129 avoids clashing with a 9Router already running on the client's 20128.
+NINEROUTER_LOCAL_PORT=20129
 SSH_CMD="ssh admin@localhost"
 if [ -s /tmp/ssh_cmd.txt ]; then
     SSH_CMD=$(cat /tmp/ssh_cmd.txt)
 fi
+NINEROUTER_HTML=""
+NINEROUTER_PLAIN=""
+case "$SSH_CMD" in
+    "ssh "*)
+        SSH_CMD="ssh -L ${NINEROUTER_LOCAL_PORT}:127.0.0.1:20128 ${SSH_CMD#ssh }"
+        NINEROUTER_URL="http://localhost:${NINEROUTER_LOCAL_PORT}/dashboard"
+        NINEROUTER_HTML=$'\n'"9Router dashboard (while connected): <code>${NINEROUTER_URL}</code>"
+        NINEROUTER_PLAIN=$'\n'"  🔀 9Router dashboard   : ${NINEROUTER_URL}"
+        ;;
+esac
 
 NOW=$(TZ='Asia/Tehran' date '+%Y-%m-%d %H:%M:%S Tehran')
 STATUS_LOVE=$(bot_status_plain "❤️ Love Whispers" "/tmp/love-whispers.pid")
@@ -85,8 +98,8 @@ TELEGRAM_MSG="<b>🚀 BOT SERVER IS ONLINE</b>
 <b>🌐 Web Control Panel</b>
 <a href=\"${PANEL_URL}\">${PANEL_URL}</a>
 
-<b>💻 SSH Terminal Access</b>
-<code>${SSH_CMD}</code>
+<b>💻 SSH Access + 9Router Tunnel</b>
+<code>${SSH_CMD}</code>${NINEROUTER_HTML}
 
 <b>🤖 Bot Status</b>
 ${STATUS_LOVE}
@@ -101,7 +114,7 @@ Started at: ${NOW}"
 PLAIN_MSG="==================================================
   🚀 BOT SERVER IS ONLINE
   🌐 Web Control Panel   : ${PANEL_URL}
-  💻 SSH Terminal Access : ${SSH_CMD}
+  💻 SSH + 9Router tunnel: ${SSH_CMD}${NINEROUTER_PLAIN}
   ------------------------------------------------
   🤖 Bot Status:
     ${STATUS_LOVE}
