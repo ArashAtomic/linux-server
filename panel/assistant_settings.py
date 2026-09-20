@@ -64,6 +64,47 @@ def _env(home):
     return values
 
 
+def _atomic_write(path, text):
+    home = path.parent
+    home.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(path.name + '.tmp')
+    temp.write_text(text, encoding='utf-8')
+    os.chmod(temp, 0o600)
+    os.replace(temp, path)
+
+
+def _write_model_config(home, provider, model, base_url):
+    path = home / 'config.yaml'
+    value = yaml.safe_load(path.read_text(encoding='utf-8')) if path.exists() else {}
+    if not isinstance(value, dict):
+        value = {}
+    section = value.get('model')
+    if isinstance(section, str):
+        section = {'default': section}
+    if not isinstance(section, dict):
+        section = {}
+    section['provider'] = provider
+    section['default'] = model
+    if base_url:
+        section['base_url'] = base_url
+    else:
+        section.pop('base_url', None)
+    value['model'] = section
+    _atomic_write(path, yaml.safe_dump(value, sort_keys=False))
+
+
+def _upsert_env(home, name, secret):
+    path = home / '.env'
+    lines = path.read_text(encoding='utf-8').splitlines() if path.exists() else []
+    pattern = re.compile(r'^\s*(?:export\s+)?' + re.escape(name) + r'\s*=')
+    entry = f'{name}={secret}'
+    if any(pattern.match(line) for line in lines):
+        lines = [entry if pattern.match(line) else line for line in lines]
+    else:
+        lines.append(entry)
+    _atomic_write(path, '\n'.join(lines) + '\n')
+
+
 def _status(home):
     model = _config(home)
     provider = model.get('provider', 'openrouter')
@@ -78,7 +119,7 @@ def _status(home):
                 providers=entries)
 
 
-def create_settings_blueprint(login_required):
+def create_settings_blueprint(login_required, restart_hermes=None):
     blueprint = Blueprint('assistant_settings', __name__, url_prefix='/settings')
 
     @blueprint.before_request
@@ -133,29 +174,49 @@ def create_settings_blueprint(login_required):
         env = os.environ.copy()
         if provider in ('custom', 'ninerouter'):
             env[CUSTOM_KEY] = ''
-        args = ['hermes', 'config', 'set']
-        if base_url is not None and base_url.strip():
-            args.extend(['model.base_url', base_url.strip()])
-        args.extend(['model.provider', provider])
-        args.extend(['model.default', model.strip()])
+        model = model.strip()
+        base_url = base_url.strip() if base_url else None
 
+        def run_cli(*args):
+            try:
+                subprocess.run(['hermes', 'config', 'set', *args], env=env, cwd=str(home),
+                               check=False, timeout=60, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+
+        if base_url:
+            run_cli('model.base_url', base_url)
+        run_cli('model.provider', provider)
+        run_cli('model.default', model)
+
+        api_key = payload.get('api_key')
+        api_key = api_key.strip() if isinstance(api_key, str) else ''
+        if api_key and ('\n' in api_key or '\r' in api_key or len(api_key) > 5000):
+            return jsonify(error='Provider key is invalid'), 400
+        env_name = CUSTOM_KEY if provider in ('custom', 'ninerouter') else PROVIDERS[provider][1]
+        if api_key:
+            run_cli(env_name, api_key)
+
+        # `hermes config set` can fail silently or leave a stale base_url behind, so verify and
+        # fall back to writing the files directly. Otherwise the panel would report a model
+        # that Hermes never actually saved.
         try:
-            subprocess.run(args, env=env, cwd=str(home), check=False, timeout=60)
-        except (OSError, subprocess.TimeoutExpired):
-            pass
+            current = _config(home)
+            if (current.get('provider') != provider or current.get('default') != model
+                    or (current.get('base_url') or None) != (base_url or None)):
+                _write_model_config(home, provider, model, base_url)
+            if api_key and _env(home).get(env_name) != api_key:
+                _upsert_env(home, env_name, api_key)
+        except (OSError, ValueError, yaml.YAMLError):
+            return jsonify(error='Unable to write Hermes settings'), 503
 
-        if provider in ('custom', 'ninerouter'):
-            key = payload.get('api_key')
-            if isinstance(key, str) and key.strip():
-                subprocess.run(['hermes', 'config', 'set', CUSTOM_KEY, key.strip()],
-                               env=env, cwd=str(home), check=False, timeout=60)
-        else:
-            env_key = PROVIDERS[provider][1]
-            key = payload.get('api_key')
-            if isinstance(key, str) and key.strip():
-                subprocess.run(['hermes', 'config', 'set', env_key, key.strip()],
-                               env=env, cwd=str(home), check=False, timeout=60)
-
-        return jsonify(saved=True, restart_required=True)
+        if restart_hermes is None:
+            return jsonify(saved=True, restarted=False, model=model, provider=provider)
+        try:
+            restart_hermes()
+        except Exception:
+            return jsonify(saved=True, restarted=False, model=model, provider=provider,
+                           error='Settings saved, but Hermes did not restart cleanly. Check Logs > Hermes Gateway.'), 503
+        return jsonify(saved=True, restarted=True, model=model, provider=provider)
 
     return blueprint

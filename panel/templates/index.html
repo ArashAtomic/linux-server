@@ -226,10 +226,26 @@
         }
         .assistant-session-list { flex: 1; overflow-y: auto; padding: 6px; }
         .assistant-session-item {
-            padding: 8px 10px; border-radius: 6px; cursor: pointer;
-            font-size: 12px; color: var(--text-secondary); white-space: nowrap;
-            overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px;
+            display: flex; align-items: center; gap: 4px; min-height: 32px;
+            padding: 6px 6px 6px 10px; border-radius: 6px; cursor: pointer;
+            font-size: 12px; color: var(--text-secondary); margin-bottom: 2px;
         }
+        .session-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .session-title-input {
+            flex: 1; min-width: 0; padding: 3px 6px; font-size: 12px; color: var(--text);
+            background: #0a1019; border: 1px solid var(--accent); border-radius: 5px; outline: none;
+        }
+        .session-actions { display: none; flex-shrink: 0; align-items: center; gap: 2px; }
+        .assistant-session-item:hover .session-actions,
+        .assistant-session-item:focus-within .session-actions { display: inline-flex; }
+        .assistant-session-item.editing .session-actions { display: none; }
+        .session-action {
+            display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0;
+            border: 0; border-radius: 5px; background: transparent; color: var(--text-muted); cursor: pointer;
+        }
+        .session-action:hover { background: rgba(255,255,255,.08); color: var(--text); }
+        .session-action.danger:hover { background: var(--red-soft); color: var(--red); }
+        @media (hover: none) { .session-actions { display: inline-flex; } }
         .assistant-session-item:hover { background: var(--panel-hover); color: var(--text); }
         .assistant-session-item.active { background: var(--accent-soft); color: var(--accent); }
         .assistant-session-empty { padding: 14px 10px; color: var(--text-muted); font-size: 11px; text-align: center; }
@@ -289,7 +305,7 @@
         .model-combo-option:hover, .model-combo-option.active { background: rgba(255,255,255,.06); color: var(--text); }
         .model-combo-option.selected { color: var(--accent); }
         .model-combo-empty { padding: 8px; font-size: 10px; color: var(--text-muted); }
-        .assistant-composer .btn:disabled { opacity: .4; cursor: not-allowed; }
+        .assistant-composer #assistant-send { min-width: 84px; justify-content: center; }
         .assistant-settings-actions { display: flex; gap: 6px; margin-top: 8px; }
         .assistant-settings-status { font-size: 10px; color: var(--text-muted); margin-top: 6px; font-family: var(--mono); }
 
@@ -312,7 +328,7 @@
         .assistant-activity { min-height: 0px; padding-top: 4px; padding-bottom: 4px; color: var(--text-muted); font-family: var(--mono); font-size: 11px; flex-shrink: 0; }
         .assistant-composer { position: relative; padding-bottom: 2px; padding-top: 2px; display: flex; gap: 8px; flex-shrink: 0; }
         .assistant-input { flex: 1; min-height: 42px; resize: vertical; padding: 10px 12px; color: var(--text); background: #0a1019; border: 1px solid var(--border-light); border-radius: 7px; font-size: 12px; }
-        .assistant-suggestions { position: absolute; left: 0; right: 132px; bottom: calc(100% + 6px); display: none; max-height: 180px; overflow-y: auto; background: var(--panel-strong); border: 1px solid var(--border-light); border-radius: 7px; box-shadow: var(--shadow); z-index: 5; }
+        .assistant-suggestions { position: absolute; left: 0; right: 96px; bottom: calc(100% + 6px); display: none; max-height: 180px; overflow-y: auto; background: var(--panel-strong); border: 1px solid var(--border-light); border-radius: 7px; box-shadow: var(--shadow); z-index: 5; }
         .assistant-suggestion { padding: 8px 10px; color: var(--text-secondary); font-family: var(--mono); font-size: 11px; cursor: pointer; outline: none; }
         .assistant-suggestion:hover, .assistant-suggestion.selected { color: var(--text); background: rgba(255,255,255,.06); }
         .assistant-sidebar-toggle {
@@ -564,7 +580,7 @@
                                     <button class="btn" id="assistant-fetch-btn" type="button" onclick="fetchAssistantModels()">↻ Fetch</button>
                                 </div>
                                 <div class="assistant-settings-actions">
-                                    <button class="btn btn-start" onclick="saveAssistantProvider()">Save & Restart Hermes</button>
+                                    <button class="btn btn-start" id="assistant-save-btn" onclick="saveAssistantProvider()">Save & Restart Hermes</button>
                                     <button class="btn-cancel" onclick="hideProviderPanel()">Cancel</button>
                                 </div>
                                 <div class="assistant-settings-status" id="assistant-settings-status"></div>
@@ -590,8 +606,7 @@
                             <div class="assistant-composer">
                                 <div id="assistant-suggestions" class="assistant-suggestions"></div>
                                 <textarea id="assistant-input" class="assistant-input" rows="2" placeholder="Ask Hermes to inspect or manage the server..."></textarea>
-                                <button class="btn btn-stop" id="assistant-stop" type="button" onclick="stopAssistant()" title="Stop response" disabled>■</button>
-                                <button class="btn btn-start" onclick="sendAssistantMessage()">➤</button>
+                                <button class="btn btn-start" id="assistant-send" type="button" onclick="handleAssistantSendClick()" title="Send message">➤ Send</button>
                             </div>
                         </div>
                     </div>
@@ -840,7 +855,9 @@
         try {
             const res = await fetch('/api/assistant/health');
             const data = await res.json();
-            document.getElementById('assistant-status').innerText = data.available ? `READY · ${data.model}` : (data.error || 'UNAVAILABLE');
+            document.getElementById('assistant-status').innerText = data.available
+                ? `READY · ${data.model}`
+                : (data.model ? `${data.error || 'UNAVAILABLE'} · ${data.model}` : (data.error || 'UNAVAILABLE'));
         } catch (e) {
             document.getElementById('assistant-status').innerText = 'UNAVAILABLE';
         }
@@ -880,89 +897,253 @@
         toggleProviderPanel();
     }
 
-    // Session list rendering from Hermes API
-    async function loadSessions() {
-        try {
-            const res = await fetch('/api/assistant/sessions');
-            const data = await res.json();
-            const list = document.getElementById('assistant-session-list');
-            list.innerHTML = '';
-            if (data.data && data.data.length === 0) {
-                list.innerHTML = '<div class="assistant-session-empty">No sessions found</div>';
-                return;
-            }
-            const sessions = data.data || [];
-            sessions.forEach((session, index) => {
-                const div = document.createElement('div');
-                div.className = 'assistant-session-item';
-                const title = session.title || session.id || 'Session';
-                // Make title editable
-                div.dataset.originalTitle = title;
-                div.innerHTML = `<span class="session-title" contenteditable="true" onblur="saveSessionTitle(this)" onfocus="this.select()">${title}</span>`;
-                div.dataset.sessionId = session.id;
-                div.onclick = (e) => {
-                    // Don't toggle if clicking on the title input
-                    if (e.target.className === 'session-title') return;
-                    loadSession(session.id);
-                };
-                list.appendChild(div);
+    // ---- Chat sessions (stored in Hermes; listed in the sidebar) ----
+    const ASSISTANT_PLACEHOLDER_TITLE = 'New chat';
+    const ICON_PENCIL = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+    const ICON_TRASH = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+    let assistantSessionId = sessionStorage.getItem('assistant_session_id') || '';
+    let assistantSessionAutoTitle = false; // true while the title is a placeholder we may replace after the first reply
+
+    async function getAssistantCsrf(forceRefresh = false) {
+        let token = forceRefresh ? '' : sessionStorage.getItem('assistant_csrf');
+        if (token) return token;
+        const res = await fetch('/api/assistant/capabilities');
+        const data = await readAssistantJson(res, 'Could not get a security token');
+        token = data.csrf_token || '';
+        if (token) sessionStorage.setItem('assistant_csrf', token);
+        return token;
+    }
+
+    async function assistantApi(method, url, body) {
+        for (let attempt = 0; attempt < 2; attempt++) {
+            const csrf = await getAssistantCsrf(attempt > 0);
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+                body: body === undefined ? undefined : JSON.stringify(body)
             });
-        } catch (e) {
-            console.error("Load sessions error", e);
+            const data = await readAssistantJson(res, 'Request failed');
+            if (res.status === 403 && attempt === 0) continue; // stale token: fetch a fresh one once
+            if (!res.ok) throw new Error(data.error || 'Request failed');
+            return data;
         }
     }
 
-    function saveSessionTitle(input) {
-        const title = input.innerText.trim();
-        const sessionId = input.parentElement.dataset.sessionId;
-        if (!title || title === input.dataset.originalTitle) return;
-        fetch(`/api/assistant/sessions/${encodeURIComponent(sessionId)}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title })
-        }).then(() => {
-            input.dataset.originalTitle = title;
-            showToast('Session title updated', 'success');
-        }).catch(() => {
-            showToast('Failed to update session title', 'error');
-            input.innerText = input.dataset.originalTitle;
+    function highlightActiveSession() {
+        document.querySelectorAll('.assistant-session-item').forEach(el => {
+            el.classList.toggle('active', !!assistantSessionId && el.dataset.sessionId === assistantSessionId);
         });
     }
 
-    function loadSession(sessionId) {
-        // Highlight selected session
-        document.querySelectorAll('.assistant-session-item').forEach(el => el.classList.remove('active'));
-        const el = document.querySelector(`.assistant-session-item[data-session-id="${sessionId}"]`);
-        if (el) el.classList.add('active');
-        // Load session messages from Hermes
-        loadSessionMessages(sessionId);
-    }
-
-    async function loadSessionMessages(sessionId) {
-        document.getElementById('assistant-activity').innerText = 'Loading session...';
+    async function loadSessions() {
+        const list = document.getElementById('assistant-session-list');
         try {
-            const res = await fetch(`/api/assistant/sessions/${encodeURIComponent(sessionId)}`);
-            const data = await res.json();
-            // Populate chat with session history
-            if (data.messages) {
-                assistantMessages = data.messages;
-            } else {
-                // Try reading messages from sessions list
-                assistantMessages = [];
-            }
-            renderAssistantMessages();
-            document.getElementById('assistant-activity').innerText = '';
-            // Persist selected session in sessionStorage
-            sessionStorage.setItem('assistant_session_id', sessionId);
+            const res = await fetch('/api/assistant/sessions?limit=100');
+            const data = await readAssistantJson(res, 'Could not load sessions');
+            if (!res.ok) throw new Error(data.error || 'Could not load sessions');
+            renderSessionList(Array.isArray(data.data) ? data.data : []);
         } catch (e) {
-            document.getElementById('assistant-activity').innerText = `Error loading session: ${e.message}`;
+            list.innerHTML = '';
+            const empty = document.createElement('div');
+            empty.className = 'assistant-session-empty';
+            empty.textContent = e.message;
+            list.appendChild(empty);
         }
     }
 
+    function renderSessionList(sessions) {
+        const list = document.getElementById('assistant-session-list');
+        list.innerHTML = '';
+        if (!sessions.length) {
+            const empty = document.createElement('div');
+            empty.className = 'assistant-session-empty';
+            empty.textContent = 'No chats yet';
+            list.appendChild(empty);
+            return;
+        }
+        sessions.forEach(session => {
+            const item = document.createElement('div');
+            item.className = 'assistant-session-item';
+            item.dataset.sessionId = session.id;
+            const label = session.title || session.id || 'Session';
+
+            const title = document.createElement('span');
+            title.className = 'session-title';
+            title.textContent = label;
+            title.title = label;
+            item.appendChild(title);
+
+            const actions = document.createElement('span');
+            actions.className = 'session-actions';
+            const rename = document.createElement('button');
+            rename.type = 'button';
+            rename.className = 'session-action';
+            rename.title = 'Rename chat';
+            rename.setAttribute('aria-label', 'Rename chat');
+            rename.innerHTML = ICON_PENCIL;
+            rename.onclick = event => { event.stopPropagation(); startSessionRename(item, session); };
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'session-action danger';
+            remove.title = 'Delete chat';
+            remove.setAttribute('aria-label', 'Delete chat');
+            remove.innerHTML = ICON_TRASH;
+            remove.onclick = event => { event.stopPropagation(); deleteSession(session.id, label); };
+            actions.appendChild(rename);
+            actions.appendChild(remove);
+            item.appendChild(actions);
+
+            item.onclick = () => { if (!item.classList.contains('editing')) loadSession(session.id); };
+            list.appendChild(item);
+        });
+        highlightActiveSession();
+    }
+
+    function startSessionRename(item, session) {
+        const titleEl = item.querySelector('.session-title');
+        if (!titleEl || item.classList.contains('editing')) return;
+        const original = session.title || '';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'session-title-input';
+        input.maxLength = 120;
+        input.value = original;
+        item.classList.add('editing');
+        titleEl.replaceWith(input);
+        input.focus();
+        input.select();
+        let finished = false;
+        const finish = async save => {
+            if (finished) return;
+            finished = true;
+            const value = input.value.trim();
+            item.classList.remove('editing');
+            if (save && value && value !== original) {
+                try {
+                    await assistantApi('PATCH', `/api/assistant/sessions/${encodeURIComponent(session.id)}`, { title: value });
+                    if (session.id === assistantSessionId) assistantSessionAutoTitle = false;
+                    showToast('Chat renamed', 'success');
+                } catch (e) {
+                    showToast(`Rename failed: ${e.message}`, 'error');
+                }
+            }
+            await loadSessions();
+        };
+        input.addEventListener('keydown', event => {
+            if (event.key === 'Enter') { event.preventDefault(); finish(true); }
+            else if (event.key === 'Escape') { event.preventDefault(); finish(false); }
+        });
+        input.addEventListener('blur', () => finish(true));
+        input.addEventListener('click', event => event.stopPropagation());
+    }
+
+    async function deleteSession(sessionId, label) {
+        if (assistantAbort && sessionId === assistantSessionId) {
+            showToast('Stop the current response before deleting this chat.', 'error');
+            return;
+        }
+        if (!confirm(`Delete "${label}"?\n\nThis permanently removes the chat and its messages.`)) return;
+        try {
+            await assistantApi('DELETE', `/api/assistant/sessions/${encodeURIComponent(sessionId)}`);
+            showToast('Chat deleted', 'success');
+        } catch (e) {
+            if (!/not found/i.test(e.message)) {
+                showToast(`Delete failed: ${e.message}`, 'error');
+                return;
+            }
+        }
+        if (sessionId === assistantSessionId) resetAssistantChatView();
+        await loadSessions();
+    }
+
+    function normalizeSessionMessages(rows) {
+        // Hermes stores tool calls/results too; the chat UI only replays plain user/assistant text.
+        return (Array.isArray(rows) ? rows : []).map(row => {
+            let content = row && row.content;
+            if (Array.isArray(content)) content = content.map(part => typeof part === 'string' ? part : (part && part.text) || '').join('');
+            return { role: row && row.role, content };
+        }).filter(m => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim());
+    }
+
+    async function loadSession(sessionId) {
+        if (assistantAbort) {
+            showToast('Stop the current response before switching chats.', 'error');
+            return false;
+        }
+        document.getElementById('assistant-activity').innerText = 'Loading session...';
+        try {
+            const res = await fetch(`/api/assistant/sessions/${encodeURIComponent(sessionId)}`);
+            const data = await readAssistantJson(res, 'Could not load session');
+            if (!res.ok) throw new Error(data.error || 'Could not load session');
+            assistantSessionId = sessionId;
+            sessionStorage.setItem('assistant_session_id', sessionId);
+            assistantMessages = normalizeSessionMessages(data.messages);
+            const title = (data.session && data.session.title) || '';
+            assistantSessionAutoTitle = assistantMessages.length === 0 && /^New chat( \(\d+\))?$/.test(title);
+            renderAssistantMessages();
+            document.getElementById('assistant-activity').innerText = '';
+            highlightActiveSession();
+            return true;
+        } catch (e) {
+            document.getElementById('assistant-activity').innerText = `Error loading session: ${e.message}`;
+            return false;
+        }
+    }
+
+    function resetAssistantChatView() {
+        assistantMessages = [];
+        assistantSessionId = '';
+        assistantSessionAutoTitle = false;
+        currentChatName = 'New chat';
+        sessionStorage.removeItem('assistant_session_id');
+        document.getElementById('assistant-activity').innerText = '';
+        document.getElementById('chat-name-display').style.display = 'none';
+        document.getElementById('chat-name-label').innerText = 'New chat';
+        document.getElementById('chat-name-value').innerText = '';
+        renderAssistantMessages();
+        highlightActiveSession();
+    }
+
+    async function createAssistantSession(title, autoTitle) {
+        const data = await assistantApi('POST', '/api/assistant/sessions', title ? { title } : {});
+        const created = data.session || {};
+        if (!created.id) throw new Error('Hermes did not return a session id');
+        assistantSessionId = created.id;
+        assistantSessionAutoTitle = !!autoTitle;
+        sessionStorage.setItem('assistant_session_id', created.id);
+        return created;
+    }
+
+    function titleFromMessage(text) {
+        const line = text.split('\n').map(part => part.trim()).find(Boolean) || ASSISTANT_PLACEHOLDER_TITLE;
+        const compact = line.replace(/\s+/g, ' ');
+        return compact.length > 48 ? `${compact.slice(0, 47)}…` : compact;
+    }
+
+    async function finalizeSessionTurn(sessionId, replied, firstMessage) {
+        if (replied && assistantSessionAutoTitle && sessionId === assistantSessionId) {
+            assistantSessionAutoTitle = false;
+            try {
+                await assistantApi('PATCH', `/api/assistant/sessions/${encodeURIComponent(sessionId)}`, { title: titleFromMessage(firstMessage) });
+            } catch (e) { /* keep the placeholder title */ }
+        }
+        await loadSessions();
+    }
+
     // Provider settings panel
-    function setAssistantStopEnabled(enabled) {
-        const button = document.getElementById('assistant-stop');
-        if (button) button.disabled = !enabled;
+    // One button doubles as Send (green) and Stop (red) while a response is being generated.
+    function setAssistantBusy(busy) {
+        const button = document.getElementById('assistant-send');
+        if (!button) return;
+        button.classList.toggle('btn-start', !busy);
+        button.classList.toggle('btn-stop', busy);
+        button.textContent = busy ? '■ Stop' : '➤ Send';
+        button.title = busy ? 'Stop response' : 'Send message';
+    }
+
+    function handleAssistantSendClick() {
+        if (assistantAbort) stopAssistant();
+        else sendAssistantMessage();
     }
 
     // Fallback list (ids must match PROVIDERS in assistant_settings.py); replaced by the server list once loaded.
@@ -1196,7 +1377,10 @@
         const apiKey = document.getElementById('assistant-api-key').value.trim();
         const model = document.getElementById('assistant-model').value.trim();
         const statusEl = document.getElementById('assistant-settings-status');
-        statusEl.innerText = 'Saving...';
+        const button = document.getElementById('assistant-save-btn');
+        button.disabled = true;
+        statusEl.innerText = 'Saving and restarting Hermes...';
+        document.getElementById('assistant-status').innerText = 'RESTARTING...';
         try {
             const res = await fetch('/api/assistant/settings/model', {
                 method: 'POST',
@@ -1206,14 +1390,18 @@
                 },
                 body: JSON.stringify({ provider, base_url: baseUrl, api_key: apiKey, model })
             });
-            const data = await res.json();
+            const data = await readAssistantJson(res, 'Save failed');
             if (!res.ok) throw new Error(data.error || 'Save failed');
             statusEl.innerText = 'Saved and Hermes restarted';
+            document.getElementById('assistant-api-key').value = '';
             showToast(`${provider} configured.`, 'success');
-            setTimeout(checkAssistant, 1500);
+            loadCurrentSettings();
         } catch (error) {
             statusEl.innerText = error.message;
             showToast(error.message, 'error');
+        } finally {
+            button.disabled = false;
+            checkAssistant();
         }
     }
 
@@ -1240,11 +1428,13 @@
         const assistantMessage = { role: 'assistant', content: 'Sending to Hermes...' };
         assistantMessages.push(assistantMessage);
         renderAssistantMessages();
-        setAssistantStopEnabled(true);
         document.getElementById('assistant-activity').innerText = 'Message received';
-        assistantAbort = new AbortController();
+        const localAbort = new AbortController();
+        assistantAbort = localAbort;
         assistantRequestId = crypto.randomUUID();
+        setAssistantBusy(true);
         let responseStarted = false;
+        let sessionForRequest = '';
         const statusTimer = setTimeout(() => {
             if (!responseStarted) {
                 assistantMessage.content = 'Connecting to your provider...';
@@ -1253,11 +1443,25 @@
             }
         }, 900);
         try {
+            // Regenerating replays a turn Hermes already stored, so it runs without a session to avoid duplicate history rows.
+            if (!reuseLastUserMessage) {
+                if (!assistantSessionId) {
+                    try {
+                        await createAssistantSession(titleFromMessage(content), false);
+                        loadSessions(); // list the new chat right away
+                    } catch (err) {
+                        showToast(`This chat won't be saved to history: ${err.message}`, 'error');
+                    }
+                }
+                sessionForRequest = assistantSessionId;
+            }
+            const chatBody = { messages: assistantMessages.slice(0, -1) };
+            if (sessionForRequest) chatBody.session_id = sessionForRequest;
             const res = await fetch('/api/assistant/chat', {
                 method: 'POST',
-                body: JSON.stringify({ messages: assistantMessages.slice(0, -1) }),
+                body: JSON.stringify(chatBody),
                 headers: { 'Content-Type': 'application/json', 'X-Assistant-Request-Id': assistantRequestId },
-                signal: assistantAbort.signal
+                signal: localAbort.signal
             });
             if (!res.ok) throw new Error(await readAssistantError(res, 'Assistant request failed'));
             const reader = res.body.getReader();
@@ -1323,9 +1527,12 @@
             }
         } finally {
             clearTimeout(statusTimer);
-            assistantAbort = null;
-            assistantRequestId = '';
-            setAssistantStopEnabled(false);
+            if (assistantAbort === localAbort) {
+                assistantAbort = null;
+                assistantRequestId = '';
+            }
+            setAssistantBusy(!!assistantAbort);
+            if (sessionForRequest) await finalizeSessionTurn(sessionForRequest, responseStarted, content);
         }
     }
 
@@ -1333,8 +1540,7 @@
     async function sendAssistantCommand(commandText) {
         const commandName = commandText.split(/\s+/, 1)[0].toLowerCase();
         if (commandName === '/new' || commandName === '/reset') {
-            newAssistantChat();
-            showToast('New Hermes session ready.', 'success');
+            await newAssistantChat(commandText.slice(commandText.indexOf(commandName) + commandName.length).trim());
             return;
         }
         const commandMessage = { role: 'user', content: commandText };
@@ -1361,7 +1567,6 @@
             document.getElementById('assistant-activity').innerText = 'Command failed';
         } finally {
             renderAssistantMessages();
-            setAssistantStopEnabled(false);
             // Persist session ID if present in response
             if (data.session_id) {
                 sessionStorage.setItem('assistant_session_id', data.session_id);
@@ -1407,15 +1612,21 @@
         await sendAssistantMessage(true);
     }
 
-    function newAssistantChat() {
-        assistantMessages = [];
-        currentChatName = 'New chat';
-        document.getElementById('assistant-activity').innerText = '';
-        document.getElementById('chat-name-display').style.display = 'none';
-        document.getElementById('chat-name-label').innerText = 'New chat';
-        document.getElementById('chat-name-value').innerText = '';
-        renderAssistantMessages();
-        sessionStorage.removeItem('assistant_session_id');
+    // /new starts a separate Hermes chat session (listed in the sidebar) instead of clearing the current one.
+    async function newAssistantChat(title = '') {
+        if (assistantAbort) {
+            showToast('Stop the current response before starting a new chat.', 'error');
+            return;
+        }
+        resetAssistantChatView();
+        try {
+            await createAssistantSession(title || ASSISTANT_PLACEHOLDER_TITLE, !title);
+            showToast('New chat started.', 'success');
+        } catch (e) {
+            showToast(`Could not create a saved chat: ${e.message}`, 'error');
+        }
+        await loadSessions();
+        document.getElementById('assistant-input').focus();
     }
 
     async function stopAssistant() {
@@ -1427,8 +1638,7 @@
             }).catch(() => {});
         }
         if (assistantAbort) assistantAbort.abort();
-        assistantAbort = null;
-        setAssistantStopEnabled(false);
+        setAssistantBusy(false);
         document.getElementById('assistant-activity').innerText = 'Stopped';
     }
 
@@ -1565,15 +1775,18 @@
         }
     }
 
-    // Load session on tab switch if one is stored
+    // On opening the assistant tab: always refresh the chat list, and restore the stored chat after a page reload.
     async function ensureSessionLoaded() {
         if (currentTab !== 'assistant') return;
-        const storedSession = sessionStorage.getItem('assistant_session_id');
-        if (storedSession) {
-            await loadSession(storedSession);
-        } else {
-            // Load session list from Hermes API
-            await loadSessions();
+        await loadSessions();
+        if (assistantSessionId && assistantMessages.length === 0 && !assistantAbort) {
+            const restored = await loadSession(assistantSessionId);
+            if (!restored) {
+                assistantSessionId = '';
+                sessionStorage.removeItem('assistant_session_id');
+                highlightActiveSession();
+                document.getElementById('assistant-activity').innerText = '';
+            }
         }
     }
 
@@ -1585,6 +1798,17 @@
             setTimeout(ensureSessionLoaded, 100);
         }
     };
+
+    // Clicking blank space in the sessions sidebar collapses the provider settings.
+    document.getElementById('assistant-sidebar').addEventListener('click', event => {
+        const panel = document.getElementById('assistant-settings-panel');
+        if (!panel.classList.contains('open')) return;
+        if (event.target.closest('.assistant-settings-panel, .assistant-session-item, .assistant-sidebar-footer, button, input, select, a')) return;
+        hideProviderPanel();
+    });
+
+    // Keep the "Active model" strip current while the assistant tab is visible.
+    setInterval(() => { if (currentTab === 'assistant' && !assistantAbort) checkAssistant(); }, 15000);
 
     setInterval(fetchStatus, 3000);
     setInterval(fetchLogs, 5000);

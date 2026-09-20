@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import signal
 import secrets
@@ -48,10 +49,14 @@ def get_hermes_model():
         with open(config_path, "r") as config_file:
             config = yaml.safe_load(config_file) or {}
         model_config = config.get("model", {})
+        if isinstance(model_config, str):
+            model_config = {"default": model_config}
+        if not isinstance(model_config, dict):
+            model_config = {}
         selected_model = model_config.get("default") or model_config.get("model")
         if isinstance(selected_model, str) and selected_model.strip():
             return selected_model.strip()
-    except (OSError, yaml.YAMLError):
+    except (OSError, yaml.YAMLError, AttributeError):
         pass
     return HERMES_MODEL
 
@@ -227,7 +232,7 @@ except ImportError:
     from assistant import create_assistant_blueprint
     from assistant_settings import PROVIDERS as SETTINGS_PROVIDERS
 
-app.register_blueprint(create_assistant_blueprint(login_required))
+app.register_blueprint(create_assistant_blueprint(login_required, restart_hermes))
 
 
 def get_bot_proc(bot_key):
@@ -661,10 +666,18 @@ def assistant_chat():
     if not request_id or len(request_id) > 128:
         return jsonify({"error": "Missing assistant request id"}), 400
 
+    upstream_headers = {**hermes_headers(), "Accept": "text/event-stream", "Content-Type": "application/json"}
+    session_id = payload.get("session_id")
+    if session_id is not None:
+        # Persists the turn in this Hermes session so it shows up in the chat history list.
+        if not isinstance(session_id, str) or not re.match(r"^[A-Za-z0-9._:-]{1,128}$", session_id):
+            return jsonify({"error": "Invalid session id"}), 400
+        upstream_headers["X-Hermes-Session-Id"] = session_id
+
     try:
         upstream = requests.post(
             f"{HERMES_API_URL}/v1/chat/completions",
-            headers={**hermes_headers(), "Accept": "text/event-stream", "Content-Type": "application/json"},
+            headers=upstream_headers,
             json=upstream_payload,
             stream=True,
             timeout=(5, 90)
