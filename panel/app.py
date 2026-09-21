@@ -743,7 +743,11 @@ def assistant_stop():
 @app.route("/api/server/redeploy", methods=["POST"])
 @login_required
 def redeploy_server():
-    trigger_github_redeploy(source="Web Panel")
+    if not trigger_github_redeploy(source="Web Panel"):
+        return jsonify({
+            "success": False,
+            "error": "Could not trigger the workflow. Check that GH_PAT has 'repo' and 'workflow' permissions."
+        }), 502
     return jsonify({
         "success": True,
         "message": "Server redeploy initiated. Fresh GitHub runner is launching with the latest code."
@@ -752,15 +756,15 @@ def redeploy_server():
 @app.route("/api/logs/<bot_key>")
 @login_required
 def get_logs(bot_key):
-    if bot_key not in BOTS and bot_key not in ["panel", "hermes", "9router"]:
-        return jsonify({"error": "Unknown log target"}), 404
-    
     log_paths = {
         "panel": "/tmp/panel.log",
         "hermes": "/tmp/hermes.log",
         "hermes-telegram": "/tmp/hermes-telegram.log",
         "9router": "/tmp/9router.log"
     }
+    if bot_key not in BOTS and bot_key not in log_paths:
+        return jsonify({"error": "Unknown log target"}), 404
+
     log_path = log_paths[bot_key] if bot_key in log_paths else BOTS[bot_key]["log_path"]
     try:
         lines = max(1, min(int(request.args.get("lines", 200)), 1000))
