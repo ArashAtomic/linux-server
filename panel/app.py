@@ -517,7 +517,15 @@ def assistant_health():
         )
         if not response.ok:
             return jsonify({"available": False, "error": "Hermes health check failed"}), 503
-        return jsonify({"available": True, "model": get_hermes_model()})
+        try:
+            version = response.json().get("version")
+        except (ValueError, AttributeError):
+            version = None
+        return jsonify({
+            "available": True,
+            "model": get_hermes_model(),
+            "version": version if isinstance(version, str) else None
+        })
     except requests.RequestException:
         return jsonify({"available": False, "error": "Hermes is unavailable"}), 503
 

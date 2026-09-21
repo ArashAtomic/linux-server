@@ -1,4 +1,4 @@
-"""Authenticated web adapter for Hermes's supported REST API and commands."""
+"""Authenticated web adapter for Hermes's supported REST API (sessions, capabilities, provider settings)."""
 import os
 import re
 
@@ -247,53 +247,5 @@ def create_assistant_blueprint(login_required, restart_hermes=None):
                 return jsonify(deleted=True)
         except requests.RequestException:
             return jsonify(error='Hermes session service is unavailable'), 503
-
-    @blueprint.post('/commands')
-    @login_required
-    def commands():
-        payload = request.get_json(silent=True) or {}
-        command = payload.get('command', '')
-        if not isinstance(command, str) or not command.strip():
-            return jsonify(error='Command required'), 400
-        if not command.startswith('/'):
-            return jsonify(error='Only slash commands are supported here'), 400
-        key = os.environ.get('HERMES_API_SERVER_KEY', '')
-        if not key:
-            return jsonify(error='Hermes API key is not configured'), 503
-        url = os.environ.get('HERMES_API_URL', 'http://127.0.0.1:8642').rstrip('/')
-        command_name = command.split(None, 1)[0].lower()
-        if command_name in {'/new', '/reset'}:
-            return jsonify(response='New Hermes session ready', command=command_name)
-        if command_name == '/help':
-            return jsonify(response='Available commands: /new, /reset, /sessions, /models, /status')
-        upstream_path = {
-            '/sessions': '/api/sessions',
-            '/models': '/v1/models',
-            '/status': '/health',
-        }.get(command_name)
-        if not upstream_path:
-            return jsonify(error=f'Unsupported command: {command_name}'), 400
-        try:
-            with requests.get(
-                f'{url}{upstream_path}',
-                headers={'Authorization': f'Bearer {key}', 'Accept': 'application/json'},
-                timeout=(3, 15), allow_redirects=False,
-            ) as response:
-                if not response.ok:
-                    return jsonify(error='Hermes rejected the command', upstream_status=response.status_code), 502
-                try:
-                    data = response.json() if response.content else {}
-                except ValueError:
-                    return jsonify(error='Hermes returned an unexpected command response'), 502
-                if command_name == '/sessions':
-                    sessions = data.get('data', []) if isinstance(data, dict) else []
-                    labels = [item.get('title') or item.get('id', 'Untitled') for item in sessions]
-                    return jsonify(response='\n'.join(labels) or 'No sessions found', sessions=sessions)
-                if command_name == '/models':
-                    models = data.get('data', []) if isinstance(data, dict) else []
-                    return jsonify(response='\n'.join(item.get('id', '') for item in models), models=models)
-                return jsonify(data)
-        except (requests.RequestException, ValueError):
-            return jsonify(error='Hermes command service is unavailable'), 503
 
     return blueprint

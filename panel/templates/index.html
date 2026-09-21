@@ -393,18 +393,33 @@ select.field { cursor: pointer; }
     border-bottom: 1px solid var(--border);
     background: rgba(0, 0, 0, .12);
 }
-.live-indicator {
+/* Log stream indicator: data-state = connecting | live | paused | error */
+.log-state {
+    --tone: 57, 230, 161;
     display: flex;
     align-items: center;
     gap: 7px;
     padding-right: 11px;
     border-right: 1px solid var(--border);
-    color: var(--green);
+    color: rgb(var(--tone));
     font-family: var(--mono);
     font-size: 9px;
+    font-weight: 700;
     letter-spacing: .08em;
+    text-shadow: 0 0 10px rgba(var(--tone), .55);
 }
-.live-indicator span { width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
+.log-state[data-state="paused"] { --tone: 251, 191, 36; }
+.log-state[data-state="error"] { --tone: 251, 113, 133; }
+.log-state[data-state="connecting"] { --tone: 104, 117, 138; text-shadow: none; }
+.log-state-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgb(var(--tone));
+    box-shadow: 0 0 8px rgba(var(--tone), .9), 0 0 16px rgba(var(--tone), .45);
+}
+.log-state[data-state="connecting"] .log-state-dot { box-shadow: none; }
+.log-state[data-state="live"] .log-state-dot { animation: pulse 1.8s ease-in-out infinite; }
 .log-search { flex: 1; max-width: 340px; min-height: 31px; }
 .log-meta { color: var(--text-muted); font-family: var(--mono); font-size: 11px; }
 .console-body { padding: 13px; }
@@ -508,6 +523,8 @@ select.field { cursor: pointer; }
 }
 .assistant-sidebar-toggle:hover, .assistant-rail-btn:hover { background: rgba(255, 255, 255, .05); color: var(--text); }
 .assistant-rail-btn { display: none; }
+.assistant-sidebar-actions { display: flex; gap: 6px; }
+.assistant-new-chat { font-size: 17px; }
 
 .assistant-session-list { flex: 1; overflow-y: auto; padding: 7px; }
 .assistant-session-empty { padding: 14px 10px; color: var(--text-muted); font-size: 11px; text-align: center; }
@@ -615,6 +632,7 @@ select.field { cursor: pointer; }
 .assistant-sidebar.collapsed .assistant-sidebar-header { justify-content: center; padding: 10px 0; border-bottom: 0; }
 .assistant-sidebar.collapsed .assistant-sidebar-toggle { width: 32px; height: 32px; }
 .assistant-sidebar.collapsed .assistant-sidebar-title,
+.assistant-sidebar.collapsed .assistant-new-chat,
 .assistant-sidebar.collapsed .assistant-session-list,
 .assistant-sidebar.collapsed .assistant-sidebar-divider,
 .assistant-sidebar.collapsed .assistant-settings-panel,
@@ -723,25 +741,9 @@ select.field { cursor: pointer; }
 }
 
 .assistant-activity { flex-shrink: 0; padding: 4px 12px; color: var(--text-muted); font-family: var(--mono); font-size: 11px; }
-.assistant-composer { position: relative; display: flex; flex-shrink: 0; gap: 9px; padding: 10px 12px 11px; }
+.assistant-composer { display: flex; flex-shrink: 0; gap: 9px; padding: 10px 12px 11px; }
 .assistant-input { flex: 1; min-height: 44px; padding: 11px 13px; border-radius: 11px; box-shadow: inset 0 1px 8px rgba(0, 0, 0, .16); font-size: 12px; resize: vertical; }
 .assistant-send { min-width: 88px; justify-content: center; border-radius: 10px; }
-.assistant-suggestions {
-    display: none;
-    position: absolute;
-    left: 12px;
-    right: 109px;
-    bottom: calc(100% + 6px);
-    z-index: 5;
-    max-height: 180px;
-    overflow-y: auto;
-    border: 1px solid var(--border-light);
-    border-radius: 7px;
-    background: var(--panel-strong);
-    box-shadow: var(--shadow);
-}
-.assistant-suggestion { padding: 8px 10px; color: var(--text-secondary); font-family: var(--mono); font-size: 11px; cursor: pointer; }
-.assistant-suggestion:hover, .assistant-suggestion.selected { background: rgba(255, 255, 255, .06); color: var(--text); }
 
 /* 8. Mobile drawer (sessions + settings slide over the chat) ---------------- */
 .assistant-sidebar-backdrop { display: none; }
@@ -814,6 +816,7 @@ select.field { cursor: pointer; }
     }
     .assistant-sidebar.collapsed .assistant-sidebar-title,
     .assistant-sidebar.collapsed .assistant-session-list { display: block; }
+    .assistant-sidebar.collapsed .assistant-new-chat { display: grid; }
     .assistant-sidebar.collapsed .assistant-sidebar-header { justify-content: space-between; padding: 11px 12px; border-bottom: 1px solid var(--border); }
     .assistant-sidebar.collapsed .assistant-sidebar-footer .btn { display: inline-flex; }
     .assistant-sidebar.collapsed .assistant-sidebar-footer { flex-direction: row; align-items: stretch; padding: 9px 11px; }
@@ -998,11 +1001,13 @@ select.field { cursor: pointer; }
             <!-- Logs -->
             <div id="tab-logs">
                 <div class="console-toolbar">
-                    <div class="live-indicator"><span></span>LIVE</div>
+                    <div class="log-state" id="log-state" data-state="connecting" role="status" aria-live="polite">
+                        <span class="log-state-dot" aria-hidden="true"></span><span id="log-state-text">CONNECTING</span>
+                    </div>
                     <div id="log-target" class="log-meta">Love Whispers</div>
                     <input id="log-search" class="log-search field" type="search" placeholder="Filter logs…">
                     <div id="log-count" class="log-meta">0 lines</div>
-                    <button class="btn" id="pause-logs" type="button">⏸ Pause</button>
+                    <button class="btn btn-restart" id="pause-logs" type="button">⏸ Pause</button>
                 </div>
                 <div class="console-body">
                     <div id="logs-content" class="logs-box">Loading logs…</div>
@@ -1044,7 +1049,10 @@ select.field { cursor: pointer; }
                         <aside class="assistant-sidebar" id="assistant-sidebar">
                             <div class="assistant-sidebar-header">
                                 <div class="assistant-sidebar-title">Sessions</div>
-                                <button class="assistant-sidebar-toggle" id="sidebar-toggle-btn" type="button" title="Collapse sidebar">◀</button>
+                                <div class="assistant-sidebar-actions">
+                                    <button class="assistant-sidebar-toggle assistant-new-chat" id="new-chat-btn" type="button" title="New chat" aria-label="New chat">+</button>
+                                    <button class="assistant-sidebar-toggle" id="sidebar-toggle-btn" type="button" title="Collapse sidebar">◀</button>
+                                </div>
                             </div>
                             <div class="assistant-session-list" id="assistant-session-list">
                                 <div class="assistant-session-empty">No sessions loaded</div>
@@ -1098,7 +1106,6 @@ select.field { cursor: pointer; }
                             <div class="assistant-messages" id="assistant-messages"></div>
                             <div class="assistant-activity" id="assistant-activity"></div>
                             <div class="assistant-composer">
-                                <div class="assistant-suggestions" id="assistant-suggestions"></div>
                                 <textarea class="assistant-input field" id="assistant-input" rows="2" placeholder="Ask Hermes to inspect or manage the server..." aria-label="Message Hermes"></textarea>
                                 <button class="btn btn-start assistant-send" id="assistant-send" type="button" title="Send message">➤ Send</button>
                             </div>
@@ -1132,9 +1139,6 @@ const TAB_IDS = ['assistant', 'logs', 'env', 'files'];
 const DEFAULT_CHAT_TITLE = 'New chat';
 const MOBILE_QUERY = window.matchMedia('(max-width: 520px)');
 
-// Must match the commands handled by POST /api/assistant/commands.
-const SLASH_COMMANDS = ['/help', '/new', '/reset', '/sessions', '/models', '/status'];
-
 // Fallback until GET /api/assistant/settings returns the server's list (ids match assistant_settings.PROVIDERS).
 const PROVIDER_FALLBACK = [
     { id: 'openrouter', name: 'OpenRouter' },
@@ -1159,7 +1163,8 @@ const state = {
     tab: 'logs',
     sshCommand: '',
     bots: {},
-    logs: { raw: '', paused: false, target: '' },
+    pendingBots: new Set(),   // bots with a start/stop/restart request in flight
+    logs: { raw: '', paused: false, target: '', health: 'connecting' },   // health: connecting | live | error
     env: { data: {}, masked: true, notice: '' },
     files: { path: '', parent: null },
     assistant: {
@@ -1171,7 +1176,6 @@ const state = {
         providers: PROVIDER_FALLBACK,
         modelOptions: [],
         modelActive: -1,
-        suggestionIndex: -1,
     },
 };
 
@@ -1256,6 +1260,16 @@ function setConnection(online) {
     $('connection-status').textContent = online ? 'CONNECTED' : 'OFFLINE';
 }
 
+/** Start is only usable while a bot is stopped, Stop only while it runs; all three lock during a request. */
+function syncBotButtons(key) {
+    const running = !!state.bots[key]?.running;
+    const busy = state.pendingBots.has(key);
+    document.querySelectorAll(`[data-bot="${key}"][data-action]`).forEach(button => {
+        const { action } = button.dataset;
+        button.disabled = busy || (action === 'start' && running) || (action === 'stop' && !running);
+    });
+}
+
 function renderBot(key, bot) {
     const badge = $(`status-${key}`);
     if (badge) {
@@ -1267,6 +1281,7 @@ function renderBot(key, bot) {
         const node = $(`${field}-${key}`);
         if (node) node.textContent = value;
     }
+    syncBotButtons(key);
 }
 
 async function refreshStatus() {
@@ -1329,26 +1344,46 @@ function renderLogs({ forceBottom = false } = {}) {
     if (forceBottom || atBottom) box.scrollTop = box.scrollHeight;   // keep the view where the user left it otherwise
 }
 
+/** Indicator next to the log filter: LIVE (green), PAUSED (amber, manual) or ERROR (red, last fetch failed). */
+function renderLogState(hint = '') {
+    const status = state.logs.paused ? 'paused' : state.logs.health;
+    const indicator = $('log-state');
+    indicator.dataset.state = status;
+    indicator.title = status === 'error' ? hint : '';
+    $('log-state-text').textContent = { connecting: 'CONNECTING', live: 'LIVE', paused: 'PAUSED', error: 'ERROR' }[status];
+}
+
 async function refreshLogs() {
-    if (state.tab !== 'logs' || state.logs.paused) return;
     const { key, label } = selectedTarget();
     const targetChanged = state.logs.target !== key;
+    // While paused, only a target switch fetches (once) so the view never shows another bot's logs.
+    if (state.tab !== 'logs' || (state.logs.paused && !targetChanged)) return;
     state.logs.target = key;
     $('log-target').textContent = label;
     try {
         const data = await apiJson(`/api/logs/${encodeURIComponent(key)}?lines=200`, { cache: 'no-store' }, 'Unable to load logs');
         state.logs.raw = data.logs || '';
+        state.logs.health = 'live';
         $('log-count').textContent = `${data.total_lines || 0} lines`;
+        renderLogState();
     } catch (error) {
         state.logs.raw = `Unable to load ${label} logs: ${error.message}`;
+        state.logs.health = 'error';
         $('log-count').textContent = 'error';
+        renderLogState(error.message);
     }
     renderLogs({ forceBottom: targetChanged });
 }
 
+/** Pause is amber (matches the PAUSED indicator); Resume is green. */
 function togglePauseLogs() {
     state.logs.paused = !state.logs.paused;
-    $('pause-logs').textContent = state.logs.paused ? '▶ Resume' : '⏸ Pause';
+    const button = $('pause-logs');
+    button.textContent = state.logs.paused ? '▶ Resume' : '⏸ Pause';
+    button.classList.toggle('btn-restart', !state.logs.paused);
+    button.classList.toggle('btn-start', state.logs.paused);
+    renderLogState();
+    if (!state.logs.paused) refreshLogs();   // catch up immediately instead of waiting for the next poll
 }
 
 /* Environment */
@@ -1435,7 +1470,7 @@ function setModelStatus(status, { model, hint = '' } = {}) {
 async function checkAssistantHealth() {
     try {
         const { data } = await fetchJson('/api/assistant/health');   // 503 bodies still carry { available, error }
-        if (data.available) setModelStatus('ready', { model: data.model });
+        if (data.available) setModelStatus('ready', { model: data.model, hint: data.version ? `Hermes ${data.version}` : '' });
         else setModelStatus('offline', { model: data.model, hint: data.error || 'Hermes is unavailable' });
     } catch (error) {
         setModelStatus('offline', { hint: error.message });
@@ -1671,21 +1706,25 @@ async function finalizeSessionTurn(sessionId, replied, firstMessage) {
     await loadSessions();
 }
 
-/** /new: start a separate saved chat (it shows up in the sidebar) instead of clearing the current one. */
-async function newChat(title = '') {
+/** "+" button: start a separate saved chat (it shows up in the sidebar) instead of clearing the current one. */
+async function newChat() {
     if (assistant.abort) {
         showToast('Stop the current response before starting a new chat.', 'error');
         return;
     }
-    resetChatView();
-    try {
-        await createSession(title || DEFAULT_CHAT_TITLE, !title);
-        showToast('New chat started.');
-    } catch (error) {
-        showToast(`Could not create a saved chat: ${error.message}`, 'error');
+    if (assistant.sessionId && assistant.autoTitle && assistant.messages.length === 0) {
+        $('assistant-input').focus();   // already on a fresh, empty chat
+    } else {
+        resetChatView();
+        try {
+            await createSession(DEFAULT_CHAT_TITLE, true);
+        } catch (error) {
+            showToast(`Could not create a saved chat: ${error.message}`, 'error');
+        }
+        await loadSessions();
+        $('assistant-input').focus();
     }
-    await loadSessions();
-    $('assistant-input').focus();
+    if (MOBILE_QUERY.matches) setDrawerOpen(false);
 }
 
 /** Runs when the assistant tab opens: health, chat list, and restoring the chat that was open before a reload. */
@@ -1883,7 +1922,7 @@ function renderMessages() {
                 class: 'assistant-message-action', type: 'button', title: 'Copy message', 'aria-label': 'Copy message', text: '⧉',
                 onclick: () => copyText(message.content, 'Message copied to clipboard!'),
             }));
-        if (message.role === 'assistant' && !message.isCommand) {
+        if (message.role === 'assistant') {
             group.append(h('button', {
                 class: 'assistant-message-action', type: 'button', title: 'Regenerate response', 'aria-label': 'Regenerate response', text: '↻',
                 onclick: () => regenerate(index),
@@ -1963,9 +2002,6 @@ async function sendMessage(reuseLastUserMessage = false) {
     const content = reuseLastUserMessage && last?.role === 'user' ? last.content : input.value.trim();
     if (!content || assistant.abort) return;
     input.value = '';
-    hideSuggestions();
-
-    if (!reuseLastUserMessage && content.startsWith('/')) return runCommand(content);
 
     if (!reuseLastUserMessage) assistant.messages.push({ role: 'user', content });
     const reply = { role: 'assistant', content: 'Sending to Hermes...' };
@@ -2050,100 +2086,29 @@ async function regenerate(index) {
     await sendMessage(true);
 }
 
-/* 6f. Slash commands (POST /api/assistant/commands) and their suggestions */
-async function runCommand(text) {
-    const name = text.split(/\s+/, 1)[0].toLowerCase();
-    if (name === '/new' || name === '/reset') return newChat(text.slice(name.length).trim());
-
-    assistant.messages.push({ role: 'user', content: text });
-    const reply = { role: 'assistant', content: '', isCommand: true };
-    assistant.messages.push(reply);
-    renderMessages();
-    setActivity('Running command...');
-    try {
-        const data = await apiJson('/api/assistant/commands', jsonOptions('POST', { command: text }), 'Command failed');
-        reply.content = data.response || data.message || JSON.stringify(data);
-        setActivity('Command completed');
-    } catch (error) {
-        reply.content = `Command error: ${error.message}`;
-        setActivity('Command failed');
-    }
-    renderMessages();
-}
-
-function hideSuggestions() {
-    $('assistant-suggestions').style.display = 'none';
-    assistant.suggestionIndex = -1;
-}
-
-function applySuggestion(command) {
-    const input = $('assistant-input');
-    input.value = `${command} `;
-    input.focus();
-    hideSuggestions();
-}
-
-function updateSuggestions() {
-    const value = $('assistant-input').value;
-    if (!value.startsWith('/')) return hideSuggestions();
-    const prefix = value.split(' ')[0];
-    const matches = SLASH_COMMANDS.filter(command => command.startsWith(prefix));
-    const box = $('assistant-suggestions');
-    box.replaceChildren(...matches.map(command => h('div', {
-        class: 'assistant-suggestion', text: command, onclick: () => applySuggestion(command),
-    })));
-    box.style.display = matches.length ? 'block' : 'none';
-    assistant.suggestionIndex = -1;
-}
-
-function highlightSuggestion(index) {
-    const items = $('assistant-suggestions').querySelectorAll('.assistant-suggestion');
-    if (!items.length) return;
-    assistant.suggestionIndex = (index + items.length) % items.length;
-    items.forEach((item, i) => item.classList.toggle('selected', i === assistant.suggestionIndex));
-    items[assistant.suggestionIndex].scrollIntoView({ block: 'nearest' });
-}
-
+/* 6f. Composer keyboard: Enter sends, Shift+Enter adds a line */
 function onInputKeydown(event) {
-    const box = $('assistant-suggestions');
-    const visible = box.style.display === 'block';
-    const picked = assistant.suggestionIndex >= 0 ? box.children[assistant.suggestionIndex] : null;
-
     if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
-        if (visible && picked) applySuggestion(picked.textContent);
-        else sendMessage();
-    } else if (event.key === 'Escape') {
-        hideSuggestions();
-    } else if (visible && event.key === 'ArrowDown') {
-        event.preventDefault();
-        highlightSuggestion(assistant.suggestionIndex + 1);
-    } else if (visible && event.key === 'ArrowUp') {
-        event.preventDefault();
-        highlightSuggestion(assistant.suggestionIndex < 0 ? -1 : assistant.suggestionIndex - 1);
-    } else if (visible && event.key === 'Tab' && picked) {
-        event.preventDefault();
-        applySuggestion(picked.textContent);
+        sendMessage();
     }
 }
 
 /* 7. Bot controls & redeploy ------------------------------------------------ */
-async function controlBot(bot, action, button) {
-    const info = state.bots[bot];
-    if (action === 'start' && info?.running) {
-        showToast(`${info.name} is already running. Use Restart instead.`, 'error');
-        return;
+async function controlBot(bot, action) {
+    state.pendingBots.add(bot);
+    syncBotButtons(bot);
+    try {
+        const data = await apiJson(`/api/bot/${encodeURIComponent(bot)}/${action}`, { method: 'POST' }, 'Action failed');
+        showToast(data.message || 'Done');
+        setTimeout(refreshLogs, 1000);
+    } catch (error) {
+        showToast(error.message, 'error');
+    } finally {
+        state.pendingBots.delete(bot);
+        syncBotButtons(bot);
+        refreshStatus();   // re-syncs the buttons with the bot's real state
     }
-    await withBusy(button, async () => {
-        try {
-            const data = await apiJson(`/api/bot/${encodeURIComponent(bot)}/${action}`, { method: 'POST' }, 'Action failed');
-            showToast(data.message || 'Done');
-            refreshStatus();
-            setTimeout(refreshLogs, 1000);
-        } catch (error) {
-            showToast(error.message, 'error');
-        }
-    });
 }
 
 async function redeployServer(button) {
@@ -2168,7 +2133,7 @@ function bindEvents() {
         ? copyText(state.sshCommand, 'SSH command copied to clipboard!')
         : showToast('SSH command is not available yet.', 'error')));
     document.querySelectorAll('[data-bot][data-action]').forEach(button =>
-        button.addEventListener('click', () => controlBot(button.dataset.bot, button.dataset.action, button)));
+        button.addEventListener('click', () => controlBot(button.dataset.bot, button.dataset.action)));
 
     // Console
     document.querySelectorAll('.tab-btn').forEach(button => button.addEventListener('click', () => switchTab(button.dataset.tab)));
@@ -2180,6 +2145,7 @@ function bindEvents() {
 
     // Assistant: sidebar
     $('sidebar-toggle-btn').addEventListener('click', toggleSidebar);
+    $('new-chat-btn').addEventListener('click', newChat);
     $('sessions-open-btn').addEventListener('click', () => setDrawerOpen(true));
     $('assistant-backdrop').addEventListener('click', () => setDrawerOpen(false));
     $('providers-btn').addEventListener('click', () => setProviderPanelOpen(true));
@@ -2215,7 +2181,6 @@ function bindEvents() {
 
     // Assistant: chat
     $('assistant-send').addEventListener('click', onSendClick);
-    $('assistant-input').addEventListener('input', updateSuggestions);
     $('assistant-input').addEventListener('keydown', onInputKeydown);
 }
 
@@ -2228,6 +2193,7 @@ function startPolling() {
 }
 
 bindEvents();
+BOT_TARGETS.forEach(syncBotButtons);   // initial state until the first status arrives (bots assumed stopped)
 startPolling();
 refreshStatus();
 refreshLogs();
