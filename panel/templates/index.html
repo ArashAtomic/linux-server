@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bot Control Center</title>
+    <title>Server Control Center</title>
     <style>
 /* ==========================================================================
-   Bot Control Center — panel stylesheet
+   Server Control Center — panel stylesheet
    1. Tokens          5. Metrics & fleet          9. Toasts
    2. Base            6. Console (tabs/logs/env)  10. Responsive
    3. Shell & header  7. Server Assistant         11. Motion
@@ -206,9 +206,10 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .btn-compact { padding: 3px 8px; }
 .btn-grow { flex: 1; min-width: 0; justify-content: center; }
 
-/* Colour language: green = start/send, amber = restart/redeploy, red = stop/logout */
+/* Colour language: green = start/send, whtie = pause, amber = restart/redeploy, red = stop/logout */
 .btn-start   { --tone: 52, 211, 153; --tone-text: #6ee7b7; --tone-text-hover: #a7f3d0; }
 .btn-restart { --tone: 251, 191, 36; --tone-text: #fcd34d; --tone-text-hover: #fde68a; }
+.btn-pause { --tone: 225, 224, 220; --tone-text: #fbfbfb; --tone-text-hover: #ffefae; }
 .btn-stop    { --tone: 251, 113, 133; --tone-text: #fda4af; --tone-text-hover: #fecdd3; }
 .btn-start, .btn-restart, .btn-stop {
     border-color: rgba(var(--tone), .36);
@@ -713,9 +714,114 @@ select.field { cursor: pointer; }
     font-size: 12px;
     line-height: 1.55;
     text-align: left;
+    overflow-wrap: anywhere;
+}
+.assistant-message p { margin: 0 0 .55em; white-space: pre-wrap; }
+.assistant-message p:last-child { margin-bottom: 0; }
+.assistant-message code { font-family: var(--mono); font-size: .92em; }
+.assistant-message strong { color: #f6f8fb; font-weight: 750; }
+.assistant-message em { font-style: italic; }
+.assistant-message u { text-decoration: underline; text-decoration-color: rgba(85, 199, 255, .65); text-underline-offset: 2px; }
+.assistant-message a { color: var(--accent); text-decoration: underline; text-decoration-color: rgba(85, 199, 255, .45); text-underline-offset: 2px; }
+.assistant-message a:hover { color: #b8eaff; text-decoration-color: currentColor; }
+.message-code-inline {
+    padding: .12em .32em;
+    border: 1px solid rgba(148, 163, 184, .18);
+    border-radius: 4px;
+    background: rgba(148, 163, 184, .09);
+    color: #dbe7f5;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
+.message-code-block-wrap {
+    margin: .65em 0;
+    overflow: hidden;
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    background: #080d15;
+}
+.message-code-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 32px;
+    padding: 5px 8px 5px 11px;
+    color: #91a0b3;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: capitalize;
+}
+.message-code-copy {
+    display: inline-grid;
+    place-items: center;
+    width: 26px;
+    height: 24px;
+    min-height: 24px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: rgba(255, 255, 255, .035);
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 10px;
+    cursor: pointer;
+    transition: transform .18s ease, color .18s ease, background .18s ease, border-color .18s ease;
+}
+.message-code-copy:hover { border-color: var(--border-light); background: rgba(255, 255, 255, .08); color: var(--text); }
+.message-code-copy:active { transform: scale(.92); }
+.message-code-copy.copied svg { animation: code-icon-pop .28s ease; }
+.message-code-controls { display: inline-flex; align-items: center; gap: 4px; }
+.message-code-toggle { display: inline-grid; place-items: center; }
+.message-code-toggle svg { transition: transform .22s ease; }
+.message-code-toggle.expanded svg { transform: rotate(180deg); }
+.message-code-toggle:disabled { opacity: .4; cursor: default; }
+.message-code-divider { height: 1px; background: var(--border-light); }
+.message-code-scroll { position: relative; max-width: 100%; max-height: 100000px; overflow: hidden; transition: max-height .42s ease; }
+.message-code-scroll.collapsed { max-height: 92px; }
+.message-code-scroll.collapsed::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 34px;
+    pointer-events: none;
+    background: linear-gradient(180deg, transparent, #080d15);
+    opacity: 1;
+    transition: opacity .35s ease;
+}
+.message-code-scroll:not(.collapsed)::after { opacity: 0; }
+.message-code-block {
+    display: block;
+    margin: 0;
+    padding: 10px 12px;
+    background: #080d15;
+    color: #dbe7f5;
+    line-height: 1.5;
+    tab-size: 2;
+}
+.assistant-message pre {
+    margin: 0;
+    max-width: 100%;
+    overflow-x: auto;
+}
+.assistant-message pre code { display: block; min-width: max-content; padding: 10px 12px; border: 0; background: transparent; white-space: pre; overflow-wrap: normal; }
+.assistant-message ul, .assistant-message ol { margin: .55em 0; padding-left: 1.45em; }
+.assistant-message ul ul, .assistant-message ul ol, .assistant-message ol ul, .assistant-message ol ol { margin: .35em 0; }
+.assistant-message li { margin: .25em 0; padding-left: .15em; }
+.assistant-message li::marker { color: var(--text-muted); }
+.assistant-task { display: inline-flex; align-items: baseline; gap: 7px; margin-left: -1.25em; }
+.assistant-task input { width: 13px; height: 13px; margin: 0; accent-color: var(--accent); vertical-align: -2px; }
+.assistant-table-wrap { max-width: 100%; margin: .65em 0; overflow-x: auto; border: 1px solid var(--border-light); border-radius: 8px; }
+.assistant-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.assistant-table th, .assistant-table td { min-width: 90px; padding: 7px 9px; border-right: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); text-align: left; vertical-align: top; }
+.assistant-table th:last-child, .assistant-table td:last-child { border-right: 0; }
+.assistant-table tr:last-child td { border-bottom: 0; }
+.assistant-table th { background: rgba(255, 255, 255, .045); color: #dbe7f5; font-weight: 750; }
+.assistant-table td { color: var(--text-secondary); }
 .assistant-message.user { border: 1px solid rgba(56, 189, 248, .20); background: linear-gradient(135deg, rgba(56, 189, 248, .13), rgba(56, 189, 248, .07)); }
 .assistant-message.assistant { border: 1px solid rgba(148, 163, 184, .11); background: rgba(255, 255, 255, .035); }
 /* Copy / regenerate: revealed on hover or keyboard focus */
@@ -839,6 +945,11 @@ select.field { cursor: pointer; }
     0%, 100% { opacity: 1; transform: scale(1); }
     50% { opacity: .62; transform: scale(.86); }
 }
+@keyframes code-icon-pop {
+    0% { opacity: 0; transform: scale(.65); }
+    70% { opacity: 1; transform: scale(1.12); }
+    100% { transform: scale(1); }
+}
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
@@ -851,7 +962,7 @@ select.field { cursor: pointer; }
         <div class="brand">
             <div class="brand-mark">🤖</div>
             <div>
-                <div class="brand-title">Bot Control Center</div>
+                <div class="brand-title">Server Control Center</div>
                 <div class="brand-subtitle">github-runner · continuous</div>
             </div>
         </div>
@@ -1007,7 +1118,7 @@ select.field { cursor: pointer; }
                     <div id="log-target" class="log-meta">Love Whispers</div>
                     <input id="log-search" class="log-search field" type="search" placeholder="Filter logs…">
                     <div id="log-count" class="log-meta">0 lines</div>
-                    <button class="btn btn-restart" id="pause-logs" type="button">⏸ Pause</button>
+                    <button class="btn btn-pause" id="pause-logs" type="button">⏸ Pause</button>
                 </div>
                 <div class="console-body">
                     <div id="logs-content" class="logs-box">Loading logs…</div>
@@ -1240,6 +1351,399 @@ async function copyText(text, successMessage) {
     }
 }
 
+function appendChatInline(target, text) {
+    let cursor = 0;
+    while (cursor < text.length) {
+        const tokenPattern = /(`{1,}|(?:\*\*|__|\+\+)(?=\S)|(?:\*|_)(?=\S)|\[[^\]\n]+\]\([^\s)]+\)|(?:https?:\/\/|mailto:)[^\s<]+)/g;
+        tokenPattern.lastIndex = cursor;
+        const match = tokenPattern.exec(text);
+        if (!match) {
+            target.append(document.createTextNode(text.slice(cursor)));
+            return;
+        }
+        const opening = match.index;
+        target.append(document.createTextNode(text.slice(cursor, opening)));
+        const token = match[0];
+
+        if (token[0] === '`') {
+            const delimiter = token;
+            const closing = text.indexOf(delimiter, opening + delimiter.length);
+            if (closing === -1) {
+                target.append(document.createTextNode(text.slice(opening)));
+                return;
+            }
+            target.append(h('code', { class: 'message-code-inline' }, text.slice(opening + delimiter.length, closing)));
+            cursor = closing + delimiter.length;
+            continue;
+        }
+
+        const linkMatch = token.match(/^\[([^\]\n]+)\]\(([^\s)]+)(?:\s+[^)]*)?\)$/);
+        if (linkMatch || /^(?:https?:\/\/|mailto:)/.test(token)) {
+            const label = linkMatch ? linkMatch[1] : token.replace(/[.,!?;:]+$/, '');
+            const href = linkMatch ? linkMatch[2] : label;
+            if (/^(?:https?:\/\/|mailto:)/i.test(href)) {
+                const link = h('a', { href, target: '_blank', rel: 'noopener noreferrer' });
+                appendChatInline(link, label);
+                target.append(link);
+                if (!linkMatch && label.length < token.length) {
+                    target.append(document.createTextNode(token.slice(label.length)));
+                }
+                cursor = opening + token.length;
+                continue;
+            }
+        }
+
+        const delimiter = token.slice(0, token.startsWith('**') || token.startsWith('__') || token.startsWith('++') ? 2 : 1);
+        const closing = text.indexOf(delimiter, opening + delimiter.length);
+        if (closing === -1) {
+            target.append(document.createTextNode(token));
+            cursor = opening + token.length;
+            continue;
+        }
+        const tag = delimiter === '++' ? 'u' : delimiter.length === 2 ? 'strong' : 'em';
+        const formatted = h(tag);
+        appendChatInline(formatted, text.slice(opening + delimiter.length, closing));
+        target.append(formatted);
+        cursor = closing + delimiter.length;
+    }
+}
+
+function appendChatLines(target, lines) {
+    lines.forEach((line, index) => {
+        if (index) target.append(h('br'));
+        appendChatInline(target, line);
+    });
+}
+
+function parseChatFence(line) {
+    const match = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    if (!match) return null;
+    const info = match[2].trim();
+    return { character: match[1][0], length: match[1].length, language: info.split(/[\s,]+/)[0] || 'Code' };
+}
+
+function isChatFenceClosing(line, fence) {
+    const match = line.match(/^ {0,3}(`+|~+) *$/);
+    return !!match && match[1][0] === fence.character && match[1].length >= fence.length;
+}
+
+function appendChatCodeBlock(target, lines, language = 'Code') {
+    const code = lines.join('\n');
+    const copyIcon = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+    const checkIcon = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>';
+    const collapsible = lines.length > 8;
+    const copyButton = h('button', {
+        class: 'message-code-copy', type: 'button', title: 'Copy code', 'aria-label': 'Copy code',
+        html: copyIcon,
+        onclick: async event => {
+            const button = event.currentTarget;
+            try {
+                await navigator.clipboard.writeText(code);
+                button.classList.remove('copied');
+                button.innerHTML = checkIcon;
+                button.classList.add('copied');
+                button.title = 'Copied code to clipboard';
+                button.setAttribute('aria-label', 'Copied code to clipboard');
+                showToast('Copied code to clipboard');
+                setTimeout(() => {
+                    button.innerHTML = copyIcon;
+                    button.title = 'Copy code';
+                    button.setAttribute('aria-label', 'Copy code');
+                }, 3000);
+            } catch {
+                showToast('Could not copy code to the clipboard.', 'error');
+            }
+        },
+    });
+    const codeScroll = h('div', { class: `message-code-scroll${collapsible ? ' collapsed' : ''}` });
+    const controls = [copyButton];
+    if (collapsible) {
+        const toggleButton = h('button', {
+            class: 'message-code-copy message-code-toggle', type: 'button', title: 'Expand code', 'aria-label': 'Expand code',
+            'aria-expanded': 'false',
+            html: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>',
+            onclick: event => {
+                const button = event.currentTarget;
+                const expanded = !codeScroll.classList.toggle('collapsed');
+                button.classList.toggle('expanded', expanded);
+                button.title = expanded ? 'Collapse code' : 'Expand code';
+                button.setAttribute('aria-label', expanded ? 'Collapse code' : 'Expand code');
+                button.setAttribute('aria-expanded', String(expanded));
+            },
+        });
+        controls.push(toggleButton);
+    }
+    const controlsElement = h('div', { class: 'message-code-controls' }, ...controls);
+    const toolbar = h('div', { class: 'message-code-toolbar' }, h('span', { text: language }), controlsElement);
+    codeScroll.append(h('pre', {}, h('code', { class: 'message-code-block' }, code)));
+    target.append(h('div', { class: 'message-code-block-wrap' },
+        toolbar,
+        h('div', { class: 'message-code-divider' }),
+        codeScroll));
+}
+
+function appendChatIndentedCode(target, lines, state) {
+    const codeLines = [];
+    while (state.index < lines.length) {
+        const line = lines[state.index];
+        if (/^(?:    |\t)/.test(line)) {
+            codeLines.push(line.replace(/^(?:    |\t)/, ''));
+            state.index += 1;
+            continue;
+        }
+        if (!line.trim()) {
+            const next = state.index + 1;
+            if (next < lines.length && /^(?:    |\t)/.test(lines[next])) {
+                codeLines.push('');
+                state.index = next;
+                continue;
+            }
+        }
+        break;
+    }
+    if (codeLines.length) appendChatCodeBlock(target, codeLines);
+}
+
+function parseChatListItem(line) {
+    const match = line.match(/^([ \t]*)([-*+]|\d{1,9}[.)])([ \t]+)([\s\S]*)$/);
+    if (!match) return null;
+    const indent = [...match[1]].reduce((total, character) => total + (character === '\t' ? 4 : 1), 0);
+    return {
+        indent,
+        ordered: /^\d/.test(match[2]),
+        marker: match[2],
+        content: match[4],
+    };
+}
+
+function parseChatTask(content) {
+    const match = content.match(/^\[([ xX])\][ \t]+([\s\S]*)$/);
+    return match ? { checked: match[1].toLowerCase() === 'x', content: match[2] } : null;
+}
+
+function appendChatListItem(listItem, lines, state, parentIndent) {
+    const paragraph = h('p');
+    listItem.append(paragraph);
+    const item = parseChatListItem(lines[state.index - 1]);
+    const task = parseChatTask(item.content);
+    if (task) {
+        const checkbox = h('input', { type: 'checkbox', disabled: true });
+        checkbox.checked = task.checked;
+        const taskContent = h('span', { class: 'assistant-task' }, checkbox);
+        appendChatInline(taskContent, task.content);
+        paragraph.append(taskContent);
+    } else {
+        appendChatInline(paragraph, item.content);
+    }
+
+    while (state.index < lines.length) {
+        const line = lines[state.index];
+        if (!line.trim()) {
+            let next = state.index + 1;
+            while (next < lines.length && !lines[next].trim()) next += 1;
+            if (next >= lines.length) return;
+
+            const nextItem = parseChatListItem(lines[next]);
+            const nextIndent = nextItem?.indent ?? [...lines[next].match(/^[ \t]*/)[0]]
+                .reduce((total, character) => total + (character === '\t' ? 4 : 1), 0);
+            if (nextIndent <= parentIndent) return;
+
+            state.index = next;
+            if (nextItem) appendChatListBlocks(listItem, lines, state, nextItem.indent);
+            else {
+                paragraph.append(h('br'));
+                appendChatInline(paragraph, lines[state.index].replace(/^(?:    |\t)/, ''));
+                state.index += 1;
+            }
+            continue;
+        }
+
+        const item = parseChatListItem(line);
+        if (item && item.indent > parentIndent) {
+            const previousIndex = state.index;
+            appendChatListBlocks(listItem, lines, state, item.indent);
+            if (state.index === previousIndex) return;
+            continue;
+        }
+        if (item || [...line.match(/^[ \t]*/)[0]]
+            .reduce((total, character) => total + (character === '\t' ? 4 : 1), 0) <= parentIndent) return;
+
+        paragraph.append(h('br'));
+        appendChatInline(paragraph, line.replace(/^(?:    |\t)/, ''));
+        state.index += 1;
+    }
+}
+
+function appendChatListBlocks(target, lines, state, parentIndent) {
+    let list = null;
+    let listType = '';
+    let listItem = null;
+
+    while (state.index < lines.length) {
+        const line = lines[state.index];
+        if (!line.trim()) {
+            let next = state.index + 1;
+            while (next < lines.length && !lines[next].trim()) next += 1;
+            if (next >= lines.length) return;
+
+            const nextItem = parseChatListItem(lines[next]);
+            const nextIndent = nextItem?.indent ?? [...lines[next].match(/^[ \t]*/)[0]]
+                .reduce((total, character) => total + (character === '\t' ? 4 : 1), 0);
+            if (nextIndent <= parentIndent) return;
+            state.index = next;
+            continue;
+        }
+
+        const item = parseChatListItem(line);
+        if (!item || item.indent < parentIndent) return;
+        if (item.indent === parentIndent) {
+            const type = item.ordered ? 'ol' : 'ul';
+            if (list && type !== listType) {
+                // Adjacent ordered and unordered items are separate sibling lists.
+                list = null;
+                listType = '';
+                listItem = null;
+            }
+            if (!list) {
+                listType = type;
+                list = h(type);
+                target.append(list);
+            }
+            listItem = h('li');
+            list.append(listItem);
+            state.index += 1;
+            appendChatListItem(listItem, lines, state, parentIndent);
+        } else if (listItem) {
+            appendChatListBlocks(listItem, lines, state, item.indent);
+        } else {
+            return;
+        }
+    }
+}
+
+function appendChatParagraph(target, lines, state) {
+    const paragraphLines = [];
+    while (state.index < lines.length) {
+        const line = lines[state.index];
+        if (!line.trim() || parseChatListItem(line) || parseChatFence(line)) break;
+        paragraphLines.push(line);
+        state.index += 1;
+    }
+    if (!paragraphLines.length) return;
+
+    const paragraph = h('p');
+    appendChatLines(paragraph, paragraphLines);
+    target.append(paragraph);
+}
+
+function splitChatTableRow(line) {
+    let value = line.trim();
+    if (value.startsWith('|')) value = value.slice(1);
+    if (value.endsWith('|') && !value.endsWith('\\|')) value = value.slice(0, -1);
+    const cells = [];
+    let cell = '';
+    let escaped = false;
+    for (const character of value) {
+        if (character === '|' && !escaped) {
+            cells.push(cell.trim());
+            cell = '';
+        } else {
+            cell += character;
+        }
+        escaped = character === '\\' && !escaped;
+        if (character !== '\\') escaped = false;
+    }
+    cells.push(cell.trim());
+    return cells;
+}
+
+function isChatTableSeparator(line) {
+    const cells = splitChatTableRow(line);
+    return cells.length > 0 && cells.every(cell => /^:?-{3,}:?$/.test(cell));
+}
+
+function isChatTableStart(lines, index) {
+    return index + 1 < lines.length && lines[index].includes('|') && isChatTableSeparator(lines[index + 1]);
+}
+
+function appendChatTable(target, lines, state) {
+    const headers = splitChatTableRow(lines[state.index]);
+    state.index += 2;
+    const rows = [];
+    while (state.index < lines.length && lines[state.index].trim() && lines[state.index].includes('|')) {
+        rows.push(splitChatTableRow(lines[state.index]));
+        state.index += 1;
+    }
+
+    const table = h('table', { class: 'assistant-table' });
+    const head = h('thead');
+    const headerRow = h('tr');
+    headers.forEach(cell => {
+        const header = h('th');
+        appendChatInline(header, cell);
+        headerRow.append(header);
+    });
+    head.append(headerRow);
+    table.append(head);
+    if (rows.length) {
+        const body = h('tbody');
+        rows.forEach(row => {
+            const tableRow = h('tr');
+            headers.forEach((_, index) => {
+                const cell = h('td');
+                appendChatInline(cell, row[index] || '');
+                tableRow.append(cell);
+            });
+            body.append(tableRow);
+        });
+        table.append(body);
+    }
+    target.append(h('div', { class: 'assistant-table-wrap' }, table));
+}
+
+/** Render the supported Markdown subset without injecting model text as HTML. */
+function renderChatMessage(target, text) {
+    const lines = String(text ?? '').replace(/\r\n?/g, '\n').split('\n');
+    const state = { index: 0 };
+
+    while (state.index < lines.length) {
+        while (state.index < lines.length && !lines[state.index].trim()) state.index += 1;
+        if (state.index >= lines.length) break;
+
+        const fence = parseChatFence(lines[state.index]);
+        if (fence) {
+            let closing = state.index + 1;
+            while (closing < lines.length && !isChatFenceClosing(lines[closing], fence)) closing += 1;
+            if (closing < lines.length) {
+                appendChatCodeBlock(target, lines.slice(state.index + 1, closing), fence.language);
+                state.index = closing + 1;
+                continue;
+            }
+            // Treat an unfinished fence as code through the end of the message.
+            appendChatCodeBlock(target, lines.slice(state.index + 1), fence.language);
+            state.index = lines.length;
+            continue;
+        }
+
+        if (/^(?:    |\t)/.test(lines[state.index])) {
+            appendChatIndentedCode(target, lines, state);
+            continue;
+        }
+
+        if (isChatTableStart(lines, state.index)) {
+            appendChatTable(target, lines, state);
+            continue;
+        }
+
+        const listItem = parseChatListItem(lines[state.index]);
+        if (listItem) {
+            appendChatListBlocks(target, lines, state, listItem.indent);
+            continue;
+        }
+        appendChatParagraph(target, lines, state);
+    }
+}
+
 /** Disable a button while an async action runs (prevents double submits). */
 async function withBusy(button, action) {
     button.disabled = true;
@@ -1344,7 +1848,7 @@ function renderLogs({ forceBottom = false } = {}) {
     if (forceBottom || atBottom) box.scrollTop = box.scrollHeight;   // keep the view where the user left it otherwise
 }
 
-/** Indicator next to the log filter: LIVE (green), PAUSED (amber, manual) or ERROR (red, last fetch failed). */
+/** Indicator next to the log filter: LIVE (green), PAUSED (white, manual) or ERROR (red, last fetch failed). */
 function renderLogState(hint = '') {
     const status = state.logs.paused ? 'paused' : state.logs.health;
     const indicator = $('log-state');
@@ -1375,12 +1879,12 @@ async function refreshLogs() {
     renderLogs({ forceBottom: targetChanged });
 }
 
-/** Pause is amber (matches the PAUSED indicator); Resume is green. */
+/** Pause is white (matches the PAUSED indicator); Resume is green. */
 function togglePauseLogs() {
     state.logs.paused = !state.logs.paused;
     const button = $('pause-logs');
     button.textContent = state.logs.paused ? '▶ Resume' : '⏸ Pause';
-    button.classList.toggle('btn-restart', !state.logs.paused);
+    button.classList.toggle('btn-pause', !state.logs.paused);
     button.classList.toggle('btn-start', state.logs.paused);
     renderLogState();
     if (!state.logs.paused) refreshLogs();   // catch up immediately instead of waiting for the next poll
@@ -1916,8 +2420,10 @@ async function saveProvider() {
 function renderMessages() {
     const box = $('assistant-messages');
     box.replaceChildren(...assistant.messages.map((message, index) => {
+        const messageElement = h('div', { class: `assistant-message ${message.role}` });
+        renderChatMessage(messageElement, message.content);
         const group = h('div', { class: `assistant-message-group ${message.role}` },
-            h('div', { class: `assistant-message ${message.role}`, text: message.content }),
+            messageElement,
             h('button', {
                 class: 'assistant-message-action', type: 'button', title: 'Copy message', 'aria-label': 'Copy message', text: '⧉',
                 onclick: () => copyText(message.content, 'Message copied to clipboard!'),

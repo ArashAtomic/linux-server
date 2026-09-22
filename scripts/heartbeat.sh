@@ -78,14 +78,14 @@ case "$SSH_CMD" in
     "ssh "*)
         SSH_CMD="ssh -L ${NINEROUTER_LOCAL_PORT}:127.0.0.1:20128 ${SSH_CMD#ssh }"
         NINEROUTER_URL="http://localhost:${NINEROUTER_LOCAL_PORT}/dashboard"
-        NINEROUTER_HTML=$'\n'"9Router dashboard (while connected): <code>${NINEROUTER_URL}</code>"
+        NINEROUTER_HTML=$'\n'"9Router dashboard (while connected): ${NINEROUTER_URL}"
         NINEROUTER_PLAIN=$'\n'"  🔀 9Router dashboard   : ${NINEROUTER_URL}"
         ;;
 esac
 
 NOW=$(TZ='Asia/Tehran' date '+%Y-%m-%d %H:%M:%S Tehran')
-STATUS_LOVE=$(bot_status_plain "❤️ Love Whispers" "/tmp/love-whispers.pid")
-STATUS_PACK=$(bot_status_plain "🎒 PackTogether" "/tmp/packtogether.pid")
+STATUS_LOVE=$(bot_status_plain "Love Whispers" "/tmp/love-whispers.pid")
+STATUS_PACK=$(bot_status_plain "PackTogether" "/tmp/packtogether.pid")
 CPU_INFO=$(get_cpu)
 RAM_INFO=$(get_memory)
 HERMES_STATUS="🔴 Hermes API: UNAVAILABLE"
