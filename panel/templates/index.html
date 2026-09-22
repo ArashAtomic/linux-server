@@ -1103,7 +1103,6 @@ select.field { cursor: pointer; }
                         <option value="packtogether">PackTogether</option>
                         <option value="panel">Management Panel</option>
                         <option value="hermes">Hermes Gateway</option>
-                        <option value="hermes-telegram">Hermes Telegram Bridge</option>
                         <option value="9router">9Router</option>
                     </select>
                 </div>
@@ -1974,7 +1973,10 @@ function setModelStatus(status, { model, hint = '' } = {}) {
 async function checkAssistantHealth() {
     try {
         const { data } = await fetchJson('/api/assistant/health');   // 503 bodies still carry { available, error }
-        if (data.available) setModelStatus('ready', { model: data.model, hint: data.version ? `Hermes ${data.version}` : '' });
+        if (data.available) {
+            const parts = [data.version ? `Hermes ${data.version}` : '', data.telegram_bot ? `Telegram: ${data.telegram_bot}` : ''].filter(Boolean);
+            setModelStatus('ready', { model: data.model, hint: parts.join(' \u00b7 ') });
+        }
         else setModelStatus('offline', { model: data.model, hint: data.error || 'Hermes is unavailable' });
     } catch (error) {
         setModelStatus('offline', { hint: error.message });

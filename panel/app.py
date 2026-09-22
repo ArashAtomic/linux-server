@@ -504,6 +504,17 @@ def status():
         "bots": bot_status
     })
 
+def get_hermes_telegram_bot():
+    if os.path.exists("/tmp/hermes_bot.txt"):
+        try:
+            with open("/tmp/hermes_bot.txt", "r") as f:
+                handle = f.read().strip()
+                if handle.startswith("@"):
+                    return handle
+        except OSError:
+            pass
+    return None
+
 @app.route("/api/assistant/health")
 @login_required
 def assistant_health():
@@ -524,7 +535,8 @@ def assistant_health():
         return jsonify({
             "available": True,
             "model": get_hermes_model(),
-            "version": version if isinstance(version, str) else None
+            "version": version if isinstance(version, str) else None,
+            "telegram_bot": get_hermes_telegram_bot()
         })
     except requests.RequestException:
         return jsonify({"available": False, "error": "Hermes is unavailable"}), 503
@@ -767,7 +779,6 @@ def get_logs(bot_key):
     log_paths = {
         "panel": "/tmp/panel.log",
         "hermes": "/tmp/hermes.log",
-        "hermes-telegram": "/tmp/hermes-telegram.log",
         "9router": "/tmp/9router.log"
     }
     if bot_key not in BOTS and bot_key not in log_paths:

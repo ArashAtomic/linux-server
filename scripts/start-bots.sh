@@ -2,6 +2,7 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="$HOME/bot-server"
 BOT_DIR="$BASE_DIR/bots"
 PANEL_DIR="$BASE_DIR/panel"
@@ -92,9 +93,32 @@ if ! command -v hermes >/dev/null 2>&1; then
     exit 1
 fi
 
-nohup env HERMES_HOME="$HERMES_HOME" API_SERVER_ENABLED="$API_SERVER_ENABLED" \
+# Hermes' built-in Telegram adapter is configured from the HERMES_TELEGRAM_* secrets before the gateway
+# starts. A Telegram problem is never fatal: the panel, tunnel and SSH must still come up.
+TELEGRAM_RC=0
+"$SCRIPT_DIR/configure-hermes-telegram.sh" || TELEGRAM_RC=$?
+if [ "$TELEGRAM_RC" -eq 0 ]; then
+    TELEGRAM_ME="$(curl -sS --max-time 10 "https://api.telegram.org/bot${HERMES_TELEGRAM_BOT_TOKEN}/getMe" 2>/dev/null || true)"
+    TELEGRAM_BOT_USERNAME="$(printf '%s' "$TELEGRAM_ME" | jq -r 'select(.ok == true) | .result.username // empty' 2>/dev/null || true)"
+    if [ -n "$TELEGRAM_BOT_USERNAME" ]; then
+        echo "Hermes Telegram bot: @$TELEGRAM_BOT_USERNAME"
+        printf '@%s' "$TELEGRAM_BOT_USERNAME" > /tmp/hermes_bot.txt
+    else
+        echo "WARNING: Telegram rejected HERMES_TELEGRAM_BOT_TOKEN; the Hermes bot will not connect."
+        notify_status_failure "<b>Hermes Telegram is not connected</b> - Telegram rejected HERMES_TELEGRAM_BOT_TOKEN (check the secret and @BotFather). The server itself started normally."
+    fi
+elif [ -n "${HERMES_TELEGRAM_BOT_TOKEN:-}" ]; then
+    notify_status_failure "<b>Hermes Telegram is not configured</b> - HERMES_TELEGRAM_BOT_TOKEN is set but the owner user ID is missing or invalid (set HERMES_TELEGRAM_ALLOWED_USERS). The server itself started normally."
+fi
+unset HERMES_TELEGRAM_BOT_TOKEN HERMES_TELEGRAM_ALLOWED_USERS HERMES_TELEGRAM_HOME_CHANNEL   # nothing else needs them
+
+# The agent's terminal inherits the gateway's environment, so it gets a minimal one: no deploy secrets
+# (GH_PAT, TAILSCALE_AUTHKEY, bot tokens, ...). Provider and Telegram credentials live in ~/.hermes/.env.
+# The supervisor restarts the gateway when it exits (Hermes' in-chat /restart, crashes).
+nohup env -i PATH="$PATH" HOME="$HOME" USER="${USER:-$(id -un)}" LANG="C.UTF-8" \
+    HERMES_HOME="$HERMES_HOME" API_SERVER_ENABLED="$API_SERVER_ENABLED" \
     API_SERVER_HOST="$API_SERVER_HOST" API_SERVER_PORT="$API_SERVER_PORT" \
-    API_SERVER_KEY="$API_SERVER_KEY" hermes gateway > /tmp/hermes.log 2>&1 &
+    API_SERVER_KEY="$API_SERVER_KEY" bash "$PANEL_DIR/run_hermes_gateway.sh" > /tmp/hermes.log 2>&1 &
 HERMES_PID=$!
 echo "$HERMES_PID" > /tmp/hermes.pid
 
@@ -120,32 +144,6 @@ if [ "$HERMES_READY" != "true" ]; then
     exit 1
 fi
 echo "Hermes Agent PID: $HERMES_PID (API 127.0.0.1:8642)"
-
-# Dedicated Hermes Telegram bridge. The heartbeat bot remains owned by the panel.
-echo
-echo "==> Starting Hermes Telegram bridge"
-if [ -z "${HERMES_TELEGRAM_BOT_TOKEN:-}" ]; then
-    echo "ERROR: HERMES_TELEGRAM_BOT_TOKEN is not configured."
-    notify_status_failure "<b>Hermes bridge startup failed</b> - HERMES_TELEGRAM_BOT_TOKEN is not configured."
-    exit 1
-fi
-cd "$PANEL_DIR"
-source .venv/bin/activate
-nohup env HERMES_HOME="$HERMES_HOME" HERMES_API_URL="http://127.0.0.1:8642" \
-    HERMES_API_SERVER_KEY="$API_SERVER_KEY" STATUS_CHAT_ID="${STATUS_CHAT_ID:-}" \
-    HERMES_TELEGRAM_BOT_TOKEN="$HERMES_TELEGRAM_BOT_TOKEN" \
-    python -u hermes_telegram.py > /tmp/hermes-telegram.log 2>&1 &
-HERMES_TELEGRAM_PID=$!
-echo "$HERMES_TELEGRAM_PID" > /tmp/hermes-telegram.pid
-deactivate
-echo "Hermes Telegram bridge PID: $HERMES_TELEGRAM_PID"
-sleep 2
-if ! kill -0 "$HERMES_TELEGRAM_PID" 2>/dev/null; then
-    echo "ERROR: Hermes Telegram bridge exited during startup."
-    tail -n 40 /tmp/hermes-telegram.log || true
-    notify_status_failure "<b>Hermes bridge startup failed</b> - Telegram bridge exited during startup. See /tmp/hermes-telegram.log in the workflow artifact."
-    exit 1
-fi
 
 # 9Router OpenAI-compatible gateway
 echo

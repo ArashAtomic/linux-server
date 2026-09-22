@@ -129,7 +129,6 @@ jobs:
             /tmp/panel.log
             /tmp/cloudflared.log
             /tmp/hermes.log
-            /tmp/hermes-telegram.log
             /tmp/9router.log
           if-no-files-found: warn
 
