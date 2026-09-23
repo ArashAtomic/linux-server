@@ -84,8 +84,8 @@ case "$SSH_CMD" in
 esac
 
 NOW=$(TZ='Asia/Tehran' date '+%Y-%m-%d %H:%M:%S Tehran')
-STATUS_LOVE=$(bot_status_plain "❤️ Love Whispers" "/tmp/love-whispers.pid")
-STATUS_PACK=$(bot_status_plain "🎒 PackTogether" "/tmp/packtogether.pid")
+STATUS_LOVE=$(bot_status_plain "Love Whispers" "/tmp/love-whispers.pid")
+STATUS_PACK=$(bot_status_plain "PackTogether" "/tmp/packtogether.pid")
 CPU_INFO=$(get_cpu)
 RAM_INFO=$(get_memory)
 HERMES_STATUS="🔴 Hermes API: UNAVAILABLE"

@@ -1161,7 +1161,7 @@ select.field { cursor: pointer; }
                                 <div class="assistant-sidebar-title">Sessions</div>
                                 <div class="assistant-sidebar-actions">
                                     <button class="assistant-sidebar-toggle assistant-new-chat" id="new-chat-btn" type="button" title="New chat" aria-label="New chat">+</button>
-                                    <button class="assistant-sidebar-toggle" id="sidebar-toggle-btn" type="button" title="Collapse sidebar">◀</button>
+                                    <button class="assistant-sidebar-toggle" id="sidebar-toggle-btn" type="button" title="Collapse sidebar">❮</button>
                                 </div>
                             </div>
                             <div class="assistant-session-list" id="assistant-session-list">
@@ -1994,7 +1994,7 @@ function toggleSidebar() {
     if (MOBILE_QUERY.matches) return setDrawerOpen(false);
     const collapsed = sidebar().classList.toggle('collapsed');
     const button = $('sidebar-toggle-btn');
-    button.textContent = collapsed ? '▶' : '◀';
+    button.textContent = collapsed ? '❯' : '❮';
     button.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
     if (collapsed) sidebar().classList.remove('settings-open');
 }

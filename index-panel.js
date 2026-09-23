@@ -3,7 +3,7 @@
 'use strict';
 
 /* ==========================================================================
-   Bot Control Center — panel script
+   Server Control Center — panel script
    1. Config & state        5. Console tabs (logs / env / files)
    2. Helpers               6. Server Assistant
    3. Toasts                7. Bot controls & redeploy
